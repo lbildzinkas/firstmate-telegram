@@ -82,7 +82,7 @@ Any text message from the user that is not one of the commands in 4.3 is a reque
 1. The bridge saves the request in FirstMate's inbox (7.2.1).
 2. As soon as the inbox has saved it, the bridge reacts to the user's message with 👀. The reaction means "FirstMate has it", whether or not FirstMate is running.
 3. If FirstMate is not running, or is running but not picking up requests, the bridge also replies once, for example: "FirstMate isn't running right now. Your request is saved and it will see it when it starts." The wording follows the `/ping` verdict (4.3.2).
-4. When FirstMate publishes its reply, the bridge sends it as a reply to the user's message and replaces 👀 with the "replied" reaction. The decided reaction is a check mark; see open question 1.
+4. When FirstMate publishes its reply, the bridge sends it as a reply to the user's message and replaces 👀 with the "replied" reaction. The decided reaction is a check mark; Telegram does not allow ✅ as a bot reaction, so 👌 stands in for it by default (`replied_reaction` in 10.1 makes it configurable).
 5. A reply too long for one Telegram message (4096 characters) is split into numbered parts, `(1/3)`, `(2/3)`, `(3/3)`, each threaded to the user's message and split at paragraph or line boundaries where possible.
 
 Details:
@@ -183,7 +183,7 @@ The verdict is the first row that applies:
 1. The bridge runs the instant checks first. If they already say FirstMate is not running or not picking up requests, it answers with that verdict and adds: "No live check was sent, so FirstMate won't answer a stale ping later."
 2. Otherwise it saves a short availability-check request in FirstMate's inbox. The request asks FirstMate to reply with one short line and take no other action. The bridge says "Asking FirstMate directly (up to 60 s)." and waits for the reply.
 3. If the reply arrives within the timeout (`live_ping_timeout`, 60 seconds by default), the bridge says "Live: FirstMate answered in 14 s."
-4. If it does not, the bridge says "Not available: FirstMate did not answer within 60 s.", followed by the instant check lines. While away mode or quiet mode is on, it adds: "In away mode, FirstMate can take a couple of minutes to pick up a request." See open question 3.
+4. If it does not, the bridge says "Not available: FirstMate did not answer within 60 s.", followed by the instant check lines. While away mode or quiet mode is on, it adds: "In away mode, FirstMate can take a couple of minutes to pick up a request." See open question 2.
 5. A reply that arrives after the timeout is still sent, marked as late: "FirstMate answered the live ping after 4 min."
 
 A live ping is a real FirstMate turn and uses a small amount of model quota. `/ping` does not.
@@ -225,7 +225,7 @@ So v1 ships `/back` in its "needs a newer FirstMate" form, and switches to the w
 - Only `firstmate-telegram start` on the Mac clears the flag. Someone holding the phone can stop the bridge but cannot start it again.
 - `/stop` does not touch FirstMate.
 
-See open question 4.
+See open question 3.
 
 ### 4.4 Alerts
 
@@ -247,7 +247,7 @@ Rules:
 - **One alert per event.** Each alert has a dedupe key (7.2.6), and the bridge never sends the same key twice.
 - **Alerts always fire**, whether or not the user is at the terminal. `/mute` makes them silent; it never drops them.
 - **A needed credential or login** has no structured record in FirstMate today. It reaches the user as a decision or blocker alert when FirstMate records it as one. A separate alert kind needs the captain outbox (section 14).
-- **Settle window.** A worker's `needs-decision`, `blocked` or `failed` status goes to FirstMate first, and FirstMate often resolves it without the user. These three kinds alert only if the same task and decision are still open after `alert_settle` (15 minutes by default). They never alert when the same task already has a decision alert from a captain hold. See open question 5.
+- **Settle window.** A worker's `needs-decision`, `blocked` or `failed` status goes to FirstMate first, and FirstMate often resolves it without the user. These three kinds alert only if the same task and decision are still open after `alert_settle` (15 minutes by default). They never alert when the same task already has a decision alert from a captain hold. See open question 4.
 - **Wording** comes from FirstMate's records: task titles, captain-hold reasons and worker status text. FirstMate's own escalation wording is not available to outside tools yet; the captain outbox proposal (section 14) would provide it.
 - **No history.** On first start, the bridge takes the current records as its starting point and does not alert on anything before it.
 - Alerts are plain text, with link previews off and the deny list applied.
@@ -451,7 +451,7 @@ So on exit 3, the bridge reads FirstMate's canonical fleet snapshot instead (`fm
 
 - The fallback answer is labelled "(away mode: from FirstMate's fleet records)".
 - It is simpler than the bearings projection; for example, it does not merge second mates' landed work into its own.
-- Open question 2 asks whether to also propose a read-only away-mode option for the bearings command upstream, so that there is one projection.
+- Open question 1 asks whether to also propose a read-only away-mode option for the bearings command upstream, so that there is one projection.
 - **Timeout**: 60 s for either call. Both may read registered second-mate homes within their own bounded budget, and may refresh FirstMate's cache of those homes' summaries. That refresh is FirstMate's documented behaviour.
 - Only exit 3 from the bearings call triggers the fallback. Any other non-zero exit is an error. (An open return catch-up does not make it exit; it shows as a `(return-catchup)` row under Next.)
 
@@ -719,7 +719,7 @@ It is needed to tie a reply to its alert, and it lives with mode 600 on the same
 ```
 
 - Only `firstmate_home` and `allowed_user_id` are required. The other keys are shown with their defaults.
-- The default for `replied_reaction` waits on open question 1.
+- The default for `replied_reaction` is 👌, which stands in for the decided check mark because Telegram does not allow ✅ as a bot reaction (4.1).
 - The bridge validates the file at start. If the file is invalid, it refuses to run and prints a clear message.
 - Changes take effect on restart.
 
@@ -965,24 +965,19 @@ Once v1 works, the project will post one comment linking this repository on Firs
 
 ## 16. Open questions
 
-1. **Bots cannot react with a check mark.**
-   - The decided design marks a sent reply with a check mark. Telegram Bot API 10.3 lets bots react only with a fixed list of 73 emoji, and ✅ is not on it; 👀 is.
-   - The allowed emoji closest to "done" are 👌, 👍, 🫡 and 💯.
-   - A bot can set only one reaction per message, so the replied reaction replaces 👀.
-   - Proposed: 👌. The configuration key `replied_reaction` holds whichever is chosen.
-2. **`/status` while away mode is on.**
+1. **`/status` while away mode is on.**
    - The decided design answers status from FirstMate's records with the same four parts as a bearings report. FirstMate's bearings command refuses while away mode is on, and on some homes while quiet mode is on.
    - v1 falls back to FirstMate's canonical fleet snapshot with its own simpler four-part projection (7.2.5).
    - Open: keep only that fallback, or also propose upstream a read-only away-mode option for the bearings command, so that there is one projection.
-3. **Live ping timeout during away mode.**
+2. **Live ping timeout during away mode.**
    - The decided live-ping timeout is 60 s. On homes where away mode runs FirstMate's away daemon, the daemon batches notifications for up to 90 s by default, so a live ping in away mode will usually end in "not available".
    - v1 keeps 60 s and adds an explanatory line (4.3.3).
    - Open: whether to use a longer timeout, such as 150 s, while away mode is on.
-4. **What `/stop` does.**
+3. **What `/stop` does.**
    - The decided command list includes `/stop` without defining it.
    - This spec reads it as the phone-side kill switch that pairs with the local `stop` command for a lost phone (4.3.7). It stops the bridge until the bridge is started again on the Mac, and it never stops FirstMate's work.
    - To confirm.
-5. **Settle window for worker statuses.**
+4. **Settle window for worker statuses.**
    - Alerting on every worker `needs-decision`, `blocked` or `failed` line would include many that FirstMate resolves without the user. v1 waits `alert_settle` (15 minutes) and alerts only if the item is still open (4.4).
    - To confirm: the window, or immediate alerts for `failed`.
 
