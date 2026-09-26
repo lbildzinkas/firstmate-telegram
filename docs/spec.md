@@ -170,7 +170,7 @@ The verdict is the first row that applies:
 | `Running, but not picking up requests; requests will queue` | The session is held, but FirstMate's wake monitoring is down |
 | `Unknown: could not confirm FirstMate is running` | The session state cannot be read, or the check failed or timed out |
 | `Running, but Claude quota is out until <time>` | Quota is readable and exhausted (`until reset time unknown` when no reset time is known) |
-| `Running, but not responding: a request has waited <n> min` | The oldest unacknowledged inbox note has waited longer than `unresponsive_after` (15 minutes by default) |
+| `Running, but not responding: a request has waited <n> min` | The oldest unacknowledged inbox note has waited longer than `unresponsive_after_minutes` (15 minutes by default) |
 | `Probably ready; listening could not be confirmed` | The session is held, but FirstMate reports its listening state as unknown |
 | `Ready` | None of the above |
 
@@ -182,7 +182,7 @@ The verdict is the first row that applies:
 
 1. The bridge runs the instant checks first. If they already say FirstMate is not running or not picking up requests, it answers with that verdict and adds: "No live check was sent, so FirstMate won't answer a stale ping later."
 2. Otherwise it saves a short availability-check request in FirstMate's inbox. The request asks FirstMate to reply with one short line and take no other action. The bridge says "Asking FirstMate directly (up to 60 s)." and waits for the reply.
-3. If the reply arrives within the timeout (`live_ping_timeout`, 60 seconds by default), the bridge says "Live: FirstMate answered in 14 s."
+3. If the reply arrives within the timeout (`live_ping_timeout_seconds`, 60 seconds by default), the bridge says "Live: FirstMate answered in 14 s."
 4. If it does not, the bridge says "Not available: FirstMate did not answer within 60 s.", followed by the instant check lines. While away mode or quiet mode is on, it adds: "In away mode, FirstMate can take a couple of minutes to pick up a request." See open question 2.
 5. A reply that arrives after the timeout is still sent, marked as late: "FirstMate answered the live ping after 4 min."
 
@@ -247,7 +247,7 @@ Rules:
 - **One alert per event.** Each alert has a dedupe key (7.2.6), and the bridge never sends the same key twice.
 - **Alerts always fire**, whether or not the user is at the terminal. `/mute` makes them silent; it never drops them.
 - **A needed credential or login** has no structured record in FirstMate today. It reaches the user as a decision or blocker alert when FirstMate records it as one. A separate alert kind needs the captain outbox (section 14).
-- **Settle window.** A worker's `needs-decision`, `blocked` or `failed` status goes to FirstMate first, and FirstMate often resolves it without the user. These three kinds alert only if the same task and decision are still open after `alert_settle` (15 minutes by default). They never alert when the same task already has a decision alert from a captain hold. See open question 4.
+- **Settle window.** A worker's `needs-decision`, `blocked` or `failed` status goes to FirstMate first, and FirstMate often resolves it without the user. These three kinds alert only if the same task and decision are still open after `alert_settle_minutes` (15 minutes by default). They never alert when the same task already has a decision alert from a captain hold. See open question 4.
 - **Wording** comes from FirstMate's records: task titles, captain-hold reasons and worker status text. FirstMate's own escalation wording is not available to outside tools yet; the captain outbox proposal (section 14) would provide it.
 - **No history.** On first start, the bridge takes the current records as its starting point and does not alert on anything before it.
 - Alerts are plain text, with link previews off and the deny list applied.
@@ -481,7 +481,7 @@ So on exit 3, the bridge reads FirstMate's canonical fleet snapshot instead (`fm
 - The dedupe key is `decision:<task-id>:<first-seen time>`.
 - A hold counts as closed after it is absent from two snapshots in a row. If the same task is held again later, that is a new event with a new key.
 
-**Settle-window check.** A `needs-decision`, `blocked` or `failed` status alerts after `alert_settle` only if both of these hold:
+**Settle-window check.** A `needs-decision`, `blocked` or `failed` status alerts after `alert_settle_minutes` only if both of these hold:
 
 - The fleet snapshot still shows that task in the same state, either in its `current_state` or in `hints.open_decisions`. When the status had a key, the match is by key.
 - No decision alert exists for the task.
@@ -601,7 +601,7 @@ These come from `fm-inbox.sh ready` (7.2.4):
 Being alive is not the same as responding, so the bridge also uses FirstMate's own inbox acknowledgements.
 
 - FirstMate acknowledges an inbox note once it has handled it.
-- The verdict is "not responding" when FirstMate is running and listening but the oldest unacknowledged inbox note is older than `unresponsive_after` (15 minutes by default). This covers notes from any client, found with `receipts --all-pending`, except notes whose announcement is known to have failed.
+- The verdict is "not responding" when FirstMate is running and listening but the oldest unacknowledged inbox note is older than `unresponsive_after_minutes` (15 minutes by default). This covers notes from any client, found with `receipts --all-pending`, except notes whose announcement is known to have failed.
 - This check depends on traffic. With no waiting note there is no evidence either way, and the verdict comes from 7.5.1 alone.
 - `/ping live` is the direct test: a round trip through FirstMate that ends in an explicit "not available" when the timeout passes (4.3.3).
 
@@ -979,7 +979,7 @@ Once v1 works, the project will post one comment linking this repository on Firs
    - This spec reads it as the phone-side kill switch that pairs with the local `stop` command for a lost phone (4.3.7). It stops the bridge until the bridge is started again on the Mac, and it never stops FirstMate's work.
    - To confirm.
 4. **Settle window for worker statuses.**
-   - Alerting on every worker `needs-decision`, `blocked` or `failed` line would include many that FirstMate resolves without the user. v1 waits `alert_settle` (15 minutes) and alerts only if the item is still open (4.4).
+   - Alerting on every worker `needs-decision`, `blocked` or `failed` line would include many that FirstMate resolves without the user. v1 waits `alert_settle_minutes` (15 minutes) and alerts only if the item is still open (4.4).
    - To confirm: the window, or immediate alerts for `failed`.
 
 [fm]: https://github.com/kunchenguid/firstmate
