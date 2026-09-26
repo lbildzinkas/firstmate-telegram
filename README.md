@@ -14,7 +14,7 @@ It talks to FirstMate only through FirstMate's inbox and records, needs no First
 ## Status
 
 **In progress.** The chat loop works: requests and replies, pairing, and the login agent.
-Alerts, `/status`, `/ping`, `/mute`, `/back`, `/stop` from the phone, `/help` and the deny list come next; until then those commands answer "not available yet".
+Alerts, `/status`, `/ping`, `/mute`, `/unmute`, `/back`, `/stop` from the phone, `/help` and the deny list come next; until then those commands answer "not available yet".
 
 - [docs/spec.md](docs/spec.md) is the v1 specification.
 - [CONTEXT.md](CONTEXT.md) is the glossary.

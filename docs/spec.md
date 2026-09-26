@@ -896,7 +896,7 @@ flowchart LR
 
 - Time comes from an injected `TimeProvider`, and process execution from an injected runner, so tests control both.
 - JSON handling uses System.Text.Json source generation, which leaves a later Native AOT build possible.
-- The implementation PRs will add `src/FirstmateTelegram/`, `tests/FirstmateTelegram.Tests/` and `install.sh`. This spec and the glossary stay where they are.
+- The implementation lives in `src/FirstmateTelegram/`, `tests/FirstmateTelegram.Tests/` and `install.sh`. This spec and the glossary stay where they are.
 
 ## 13. Testing strategy
 
