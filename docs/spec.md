@@ -385,7 +385,7 @@ fm-inbox.sh receipts --all-pending
   - Note rows are `{id, at, source, request_id, body, acknowledged, announced, reply}`.
   - Reply rows are `{id, at, body, cursor}`. `id` is the note id, and `cursor` is a 12-digit, zero-padded sequence number that puts all replies in a strict order.
 - `--after <cursor>` returns the replies after that cursor, oldest first, at most 20 at a time. When `omitted[]` reports replies left out by that bound, the bridge calls again straight away from the new `reply_cursor`.
-- **For each reply to a bridge note**, the bridge sends the reply, sets the "replied" reaction, and then stores the reply's cursor.
+- **For each reply to a bridge note**, the bridge sends the reply, stores the reply's cursor once the last part is sent, and then sets the "replied" reaction best-effort: a failed reaction is logged and skipped, and never blocks the cursor.
 - **Replies to other notes**, such as voice, console or terminal tools, only advance the cursor.
 - **Cadence**: every 5 s while a bridge request or live ping is waiting for its reply, otherwise every 60 s.
 - `--all-pending`, run every 60 s and on `/ping`, finds the oldest unacknowledged note for the "not responding" check (7.5.2).
@@ -645,6 +645,7 @@ The bridge runs its own `getUpdates` loop rather than the library's built-in rec
 ### 8.2 Replies: at least once to Telegram
 
 - Parts already sent are recorded as they go, and the reply cursor is stored only after the last part of a reply is sent.
+- The "replied" reaction is set best-effort after the last part is sent: a failed reaction is logged and skipped, and never blocks the reply cursor.
 - A crash can therefore resend at most one part of one reply. Telegram's `sendMessage` has no idempotency key, so exactly-once delivery is not possible in this direction.
 - A reply is never skipped.
 
@@ -720,7 +721,7 @@ It is needed to tie a reply to its alert, and it lives with mode 600 on the same
 
 - Only `firstmate_home` and `allowed_user_id` are required. The other keys are shown with their defaults.
 - The default for `replied_reaction` is 👌, which stands in for the decided check mark because Telegram does not allow ✅ as a bot reaction (4.1).
-- The bridge validates the file at start. If the file is invalid, it refuses to run and prints a clear message.
+- The bridge validates the file at start. If the file is invalid, it refuses to run and prints a clear message. A `replied_reaction` that is not one of Telegram's allowed bot reaction emoji is invalid.
 - Changes take effect on restart.
 
 ### 10.2 Setup: `firstmate-telegram setup`
