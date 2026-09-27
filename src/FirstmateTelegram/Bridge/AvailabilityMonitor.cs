@@ -114,8 +114,16 @@ public sealed class AvailabilityMonitor : BackgroundService
         if (streak >= 2 && now - goodSince >= DebounceWindow)
         {
             // "Available again" is sent only for an outage the bridge alerted, and only while away mode is on.
-            if (watch.Alerted && away && now >= _suppressUntil)
+            if (watch.Alerted && away)
             {
+                if (now < _suppressUntil)
+                {
+                    await _store.UpdateStateAsync(
+                        state => state with { Availability = watch with { BadStreak = 0, GoodStreak = streak, GoodSince = goodSince } },
+                        cancellationToken);
+                    return;
+                }
+
                 await _alerts.SendAsync(
                     $"availability:back:{watch.BadSince.ToString("O", CultureInfo.InvariantCulture)}",
                     null,

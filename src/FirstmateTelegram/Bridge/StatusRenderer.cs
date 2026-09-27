@@ -120,7 +120,7 @@ public sealed class StatusRenderer
     Parts FromFleet(FleetSnapshot snapshot)
     {
         var titles = snapshot.Records
-            .Where(record => record.Id is not null)
+            .Where(record => record.Id is not null && !_redactor.IsDenied(record.Repo))
             .GroupBy(record => record.Id!, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First().Title, StringComparer.Ordinal);
 

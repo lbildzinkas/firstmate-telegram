@@ -101,6 +101,45 @@ public sealed class DenyListTests
     }
 
     [Fact]
+    public async Task A_fleet_next_row_names_no_denied_title_it_waits_on()
+    {
+        await using var harness = await BridgeHarness.StartAsync();
+        harness.Config = harness.Config with { DenyList = ["acme/webapp"] };
+        harness.FirstMate.SetReady("ready-running-away.json");
+        harness.FirstMate.Script("bearings", new { exit = 3, stderr = "away mode is on" });
+        harness.FirstMate.SetFleetSnapshotText(FleetSnapshot(
+            Record("publish-docs", "Publish the docs", "queued", repo: "public/site", blockers: ["payroll"]),
+            Record("payroll", "Payroll migration", "blocked", repo: "acme/webapp")));
+        harness.Telegram.EnqueueText(BridgeHarness.UserId, "/status");
+        var bridge = await harness.StartInstance().InitializedAsync();
+
+        await bridge.PollAsync();
+
+        var sent = Assert.Single(harness.Telegram.SentMessages()).Text;
+        Assert.EndsWith("Next (1)\n• Publish the docs", sent);
+        Assert.DoesNotContain("Payroll migration", sent);
+    }
+
+    static string FleetSnapshot(params JsonObject[] records) => new JsonObject
+    {
+        ["schema"] = "fm-fleet-snapshot.v1",
+        ["tasks"] = new JsonArray(),
+        ["backlog"] = new JsonObject { ["records"] = new JsonArray(records) },
+    }.ToJsonString();
+
+    static JsonObject Record(string id, string title, string state, string repo, string[]? blockers = null) => new()
+    {
+        ["structured"] = true,
+        ["id"] = id,
+        ["title"] = title,
+        ["state"] = state,
+        ["captain_actionable"] = false,
+        ["hold_reason"] = null,
+        ["repo"] = repo,
+        ["unresolved_blocker_ids"] = new JsonArray((blockers ?? []).Select(blocker => (JsonNode)blocker).ToArray()),
+    };
+
+    [Fact]
     public async Task A_pr_alert_for_a_private_project_names_no_title_repo_or_link()
     {
         await using var harness = await BridgeHarness.StartAsync();

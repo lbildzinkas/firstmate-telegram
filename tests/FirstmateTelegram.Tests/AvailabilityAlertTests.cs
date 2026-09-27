@@ -169,6 +169,38 @@ public sealed class AvailabilityAlertTests
     }
 
     [Fact]
+    public async Task An_available_again_confirmed_during_the_wake_grace_fires_once_the_grace_passes()
+    {
+        await using var harness = await BridgeHarness.StartAsync();
+        var time = AwayClock();
+        harness.FirstMate.SetReady("ready-not-running-away.json");
+        var bridge = await harness.StartInstance(time: time).InitializedAsync();
+
+        await PollAsync(bridge, time, minutes: 5);
+        Assert.Single(harness.Telegram.SentMessages());
+
+        harness.FirstMate.SetReady("ready-running-away.json");
+        time.Advance(TimeSpan.FromMinutes(30)); // the wall clock jumps: the Mac slept and woke
+        await bridge.CheckAvailabilityAsync(); // the outage is over: the recovery debounce starts over too
+
+        time.Advance(TimeSpan.FromMinutes(2));
+        await bridge.CheckAvailabilityAsync(); // the recovery is confirmed, but still inside the wake grace
+        Assert.Single(harness.Telegram.SentMessages());
+
+        time.Advance(TimeSpan.FromMinutes(1));
+        await bridge.CheckAvailabilityAsync(); // still inside the grace: the announcement is held
+        Assert.Single(harness.Telegram.SentMessages());
+
+        time.Advance(TimeSpan.FromMinutes(2));
+        await bridge.CheckAvailabilityAsync(); // the grace passed: the held announcement goes out
+
+        var back = harness.Telegram.SentMessages()[^1];
+        Assert.StartsWith("FirstMate is available again (was stopped for ", back.Text);
+        Assert.Equal(2, harness.Telegram.SentMessages().Count);
+        Assert.Null(bridge.Store.State.Availability);
+    }
+
+    [Fact]
     public async Task An_outage_that_recovered_without_alerting_never_shortens_a_later_outages_debounce()
     {
         await using var harness = await BridgeHarness.StartAsync();
