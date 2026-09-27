@@ -154,4 +154,24 @@ public sealed class CrashWindowTests
         Assert.Equal("Here it is.", Assert.Single(harness.Telegram.SentMessages().DistinctBy(message => message.Text)).Text);
         Assert.Equal(cursor, bridge.Store.State.ReplyCursor);
     }
+
+    [Fact]
+    public async Task Crash_after_an_alert_is_sent_but_before_its_message_id_is_recorded_never_sends_it_twice()
+    {
+        await using var harness = await BridgeHarness.StartAsync();
+        var writer = new CrashingStateWriter();
+        var crashed = await harness.StartInstance(writer).InitializedAsync();
+        await crashed.WatchAsync();
+        writer.CrashOn("alerts.json", skip: 1); // the dedupe key was written; the message id was not
+
+        harness.FirstMate.AppendLedger("""{"v":1,"ts":"2026-09-26T14:10:00Z","event":"task.pr_ready","task":"ship-task","pr":"https://github.com/acme/webapp/pull/7"}""");
+        await Assert.ThrowsAsync<SimulatedCrashException>(crashed.WatchAsync);
+        Assert.Single(harness.Telegram.SentMessages());
+
+        var restarted = await harness.StartInstance().InitializedAsync();
+        await restarted.WatchAsync();
+        await restarted.WatchAsync();
+
+        Assert.Single(harness.Telegram.SentMessages()); // exactly one alert per event, even across the crash
+    }
 }

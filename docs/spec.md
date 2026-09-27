@@ -1,6 +1,6 @@
 # firstmate-telegram: v1 specification
 
-Status: specification. v1 is built against this document, one part at a time.
+Status: v1 is built against this document; v1 is now complete, shipped one pull request at a time.
 Every FirstMate fact below was checked against FirstMate `main` at commit [`e9a6675`][fm-commit] (2026-09-26).
 Words with a fixed meaning here (bridge, request, reply, alert, status answer, availability, ping, away mode, private project, explicit return) are defined in [CONTEXT.md](../CONTEXT.md).
 

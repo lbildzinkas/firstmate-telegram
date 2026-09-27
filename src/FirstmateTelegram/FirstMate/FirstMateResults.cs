@@ -78,7 +78,11 @@ public sealed record BearingsSnapshot(
 /// <summary>A bearings read. <see cref="AwayRefused"/> is FirstMate's exit 3: away mode refuses the projection, and the fleet snapshot is used instead.</summary>
 public sealed record BearingsResult(BearingsSnapshot? Snapshot, bool AwayRefused, CallFailure? Failure);
 
-public sealed record FleetTask(string? Project, string Title, string? State, bool SecondMate);
+public sealed record FleetTask(string Id, string? Project, string Title, string? State, string? Kind, bool SecondMate, string? Repo, int OpenDecisionCount, string OpenDecisionsRaw)
+{
+    /// <summary>True when the snapshot shows this task holding at least one open decision (hints.open_decisions).</summary>
+    public bool HasOpenDecisions => OpenDecisionCount > 0;
+}
 
 public sealed record FleetRecord(
     string? Id,
@@ -86,6 +90,7 @@ public sealed record FleetRecord(
     string? State,
     bool CaptainActionable,
     string? HoldReason,
+    string? Repo,
     IReadOnlyList<string> UnresolvedBlockerIds,
     DateTimeOffset? CompletedAt);
 
@@ -93,3 +98,22 @@ public sealed record FleetRecord(
 public sealed record FleetSnapshot(IReadOnlyList<FleetTask> Tasks, IReadOnlyList<FleetRecord> Records);
 
 public sealed record FleetSnapshotResult(FleetSnapshot? Snapshot, CallFailure? Failure);
+
+/// <summary>The outcome of <c>fm-inbox.sh return</c>: saved like a note, refused by a FirstMate without the hook, or failed.</summary>
+public enum ReturnOutcome
+{
+    Saved,
+
+    /// <summary>Saved, but FirstMate was not woken (exit 3); the wake is repaired later.</summary>
+    SavedWithoutWake,
+
+    /// <summary>Today's FirstMate answers "unknown subcommand: return": there is no explicit-return hook yet (spec 7.2.8).</summary>
+    NoHook,
+
+    Failed,
+}
+
+public sealed record ReturnSaveResult(ReturnOutcome Outcome, string? NoteId, string? SavedOutcome, CallFailure? Failure)
+{
+    public bool IsSaved => Outcome is ReturnOutcome.Saved or ReturnOutcome.SavedWithoutWake;
+}

@@ -97,8 +97,10 @@ public static class RunCommand
         services.AddSingleton(environment.Time);
         services.AddSingleton(environment.ProcessRunner);
         services.AddSingleton<WakeSignal>();
-        services.AddSingleton(provider => new TelegramGateway(client, environment.Time, provider.GetRequiredService<ILogger<TelegramGateway>>()));
+        services.AddSingleton(new Redactor(config.DenyList));
+        services.AddSingleton(provider => new TelegramGateway(client, environment.Time, provider.GetRequiredService<ILogger<TelegramGateway>>(), redactor: provider.GetRequiredService<Redactor>()));
         services.AddSingleton(provider => new FirstMateClient(provider.GetRequiredService<IProcessRunner>(), config.FirstmateHome));
+        services.AddSingleton(provider => new FleetLedger(config.FirstmateHome));
         services.AddSingleton(provider => new AccessGate(config.AllowedUserId, provider.GetRequiredService<ILogger<AccessGate>>()));
         services.AddSingleton(provider => new QuotaReader(provider.GetRequiredService<IProcessRunner>(), config.QuotaProvider));
         services.AddSingleton(provider => new AvailabilityReader(
@@ -112,14 +114,37 @@ public static class RunCommand
         services.AddSingleton(provider => new StatusRenderer(
             provider.GetRequiredService<FirstMateClient>(),
             environment.Time,
-            provider.GetRequiredService<ILogger<StatusRenderer>>()));
+            provider.GetRequiredService<ILogger<StatusRenderer>>(),
+            provider.GetRequiredService<Redactor>()));
         services.AddSingleton<RequestSubmitter>();
+        services.AddSingleton<AlertSender>();
+        services.AddSingleton<IBridgeStopper>(provider => new HostStopper(provider.GetRequiredService<IHostApplicationLifetime>()));
         services.AddSingleton(provider => new CommandRouter(
             provider.GetRequiredService<TelegramGateway>(),
             provider.GetRequiredService<AvailabilityReader>(),
             provider.GetRequiredService<StatusRenderer>(),
             provider.GetRequiredService<RequestSubmitter>(),
+            store,
+            environment.Time,
             TimeSpan.FromSeconds(config.LivePingTimeoutSeconds)));
+        services.AddSingleton(provider => new AlertWatcher(
+            provider.GetRequiredService<FirstMateClient>(),
+            provider.GetRequiredService<FleetLedger>(),
+            provider.GetRequiredService<AlertSender>(),
+            store,
+            provider.GetRequiredService<Redactor>(),
+            environment.Time,
+            TimeSpan.FromMinutes(config.AlertSettleMinutes),
+            config.AllowedUserId,
+            provider.GetRequiredService<ILogger<AlertWatcher>>()));
+        services.AddSingleton(provider => new AvailabilityMonitor(
+            provider.GetRequiredService<AvailabilityReader>(),
+            provider.GetRequiredService<AlertSender>(),
+            store,
+            environment.Time,
+            QuotaReader.ProviderDisplay(config.QuotaProvider),
+            config.AllowedUserId,
+            provider.GetRequiredService<ILogger<AvailabilityMonitor>>()));
         services.AddHostedService<UpdatePoller>();
         services.AddHostedService(provider => new ReplyForwarder(
             provider.GetRequiredService<FirstMateClient>(),
@@ -130,6 +155,14 @@ public static class RunCommand
             provider.GetRequiredService<AvailabilityReader>(),
             environment.Time,
             provider.GetRequiredService<ILogger<ReplyForwarder>>()));
+        services.AddHostedService(provider => provider.GetRequiredService<AlertWatcher>());
+        services.AddHostedService(provider => provider.GetRequiredService<AvailabilityMonitor>());
         return builder.Build();
+    }
+
+    /// <summary>The /stop hook: the host stops with a deliberate exit, so launchd does not restart the bridge.</summary>
+    sealed class HostStopper(IHostApplicationLifetime lifetime) : IBridgeStopper
+    {
+        public void StopBridge() => lifetime.StopApplication();
     }
 }

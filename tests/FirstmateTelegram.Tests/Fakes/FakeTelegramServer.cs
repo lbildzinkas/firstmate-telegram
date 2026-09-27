@@ -58,6 +58,21 @@ public sealed class FakeTelegramServer : IAsyncDisposable
     public int EnqueueText(long fromId, string text, long? chatId = null, string chatType = "private") =>
         Enqueue(fromId, chatId ?? fromId, chatType, message => message["text"] = text);
 
+    /// <summary>A message the user sent as a reply to one of the bot's messages, such as an alert.</summary>
+    public int EnqueueReply(long fromId, int replyToMessageId, string text) =>
+        Enqueue(fromId, fromId, "private", message =>
+        {
+            message["text"] = text;
+            message["reply_to_message"] = new JsonObject
+            {
+                ["message_id"] = replyToMessageId,
+                ["from"] = new JsonObject { ["id"] = BotId, ["is_bot"] = true, ["first_name"] = "FirstMate", ["username"] = BotUsername },
+                ["chat"] = new JsonObject { ["id"] = fromId, ["type"] = "private" },
+                ["date"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                ["text"] = "the alert",
+            };
+        });
+
     public int EnqueuePhoto(long fromId) =>
         Enqueue(fromId, fromId, "private", message => message["photo"] = new JsonArray(new JsonObject
         {
@@ -78,9 +93,11 @@ public sealed class FakeTelegramServer : IAsyncDisposable
         }
     }
 
-    public sealed record SentMessage(long ChatId, string Text, int? ReplyToMessageId, bool? AllowSendingWithoutReply, bool LinkPreviewDisabled, string? ParseMode);
+    public sealed record SentMessage(long ChatId, string Text, int? ReplyToMessageId, bool? AllowSendingWithoutReply, bool LinkPreviewDisabled, string? ParseMode, bool? DisableNotification);
 
     public sealed record Reaction(long ChatId, int MessageId, IReadOnlyList<string> Emoji);
+
+    public sealed record RegisteredCommands(long ChatId, IReadOnlyList<(string Command, string Description)> Commands);
 
     public IReadOnlyList<SentMessage> SentMessages()
     {
@@ -92,7 +109,18 @@ public sealed class FakeTelegramServer : IAsyncDisposable
                 call.Body["reply_parameters"]?["message_id"]?.GetValue<int>(),
                 call.Body["reply_parameters"]?["allow_sending_without_reply"]?.GetValue<bool>(),
                 call.Body["link_preview_options"]?["is_disabled"]?.GetValue<bool>() == true,
-                call.Body["parse_mode"]?.GetValue<string>())).ToList();
+                call.Body["parse_mode"]?.GetValue<string>(),
+                call.Body["disable_notification"]?.GetValue<bool>())).ToList();
+        }
+    }
+
+    public IReadOnlyList<RegisteredCommands> RegisteredCommandLists()
+    {
+        lock (_gate)
+        {
+            return _calls.Where(call => call.Method == "setMyCommands").Select(call => new RegisteredCommands(
+                call.Body["scope"]!["chat_id"]!.GetValue<long>(),
+                call.Body["commands"]!.AsArray().Select(command => (command!["command"]!.GetValue<string>(), command!["description"]!.GetValue<string>())).ToList())).ToList();
         }
     }
 
@@ -171,6 +199,7 @@ public sealed class FakeTelegramServer : IAsyncDisposable
             "getUpdates" => await GetUpdatesAsync(body, context.RequestAborted),
             "sendMessage" => SendMessage(body),
             "setMessageReaction" => JsonValue.Create(true),
+            "setMyCommands" => JsonValue.Create(true),
             "getWebhookInfo" => new JsonObject { ["url"] = WebhookUrl ?? "", ["has_custom_certificate"] = false, ["pending_update_count"] = PendingUpdateCount() },
             "deleteWebhook" => DeleteWebhook(),
             _ => null,

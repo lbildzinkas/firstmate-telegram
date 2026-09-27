@@ -51,13 +51,22 @@ public sealed class ConfigFileTests
     [InlineData("""{"schema":"firstmate-telegram.config.v1","firstmate_home":"/h","allowed_user_id":1,"alert_settle_minutes":0}""", "positive whole number")]
     [InlineData("""{"schema":"firstmate-telegram.config.v1","firstmate_home":"/h","allowed_user_id":1,"alowed_user_id":1}""", "unknown key \"alowed_user_id\"")]
     [InlineData("""{"schema":"firstmate-telegram.config.v1","firstmate_home":"/h","allowed_user_id":1,"deny_list":"acme"}""", "list of strings")]
-    [InlineData("""{"schema":"firstmate-telegram.config.v1","firstmate_home":"/h","allowed_user_id":1,"deny_list":["acme"]}""", "\"deny_list\" is not supported by this version")]
+    [InlineData("""{"schema":"firstmate-telegram.config.v1","firstmate_home":"/h","allowed_user_id":1,"deny_list":["acme"," "]}""", "non-empty strings")]
     [InlineData("""not json""", "not valid JSON")]
     public void An_invalid_file_is_refused_with_a_message_that_names_the_problem(string json, string expected)
     {
         var error = Assert.Throws<BridgeException>(() => ConfigFile.Parse(json));
 
         Assert.Contains(expected, error.Message);
+    }
+
+    [Fact]
+    public void A_deny_list_names_projects_that_must_never_appear_on_Telegram()
+    {
+        const string config = """{"schema":"firstmate-telegram.config.v1","firstmate_home":"/h","allowed_user_id":1,"deny_list":["acme/webapp","acme-secret"]}""";
+
+        Assert.Equal(["acme/webapp", "acme-secret"], ConfigFile.Parse(config).DenyList);
+        Assert.Equal(["acme/webapp", "acme-secret"], ConfigFile.Parse(ConfigFile.Serialize(ConfigFile.Parse(config))).DenyList);
     }
 
     [Fact]

@@ -272,6 +272,45 @@ public sealed class FirstMateClientTests
         Assert.Contains("unknown subcommand: return", Fixtures.Read("return-unknown-subcommand.stderr"));
     }
 
+    [Fact]
+    public async Task Return_exit_1_unknown_subcommand_reads_as_there_is_no_hook_yet()
+    {
+        var (client, runner) = Client(new ProcessResult(1, "", Fixtures.Read("return-unknown-subcommand.stderr")));
+
+        var result = await client.SaveReturnAsync("tg:1:2:3", CancellationToken.None);
+
+        Assert.Equal(ReturnOutcome.NoHook, result.Outcome);
+        Assert.False(result.IsSaved);
+        Assert.Null(result.Failure);
+        Assert.Equal(["return", "--request-id", "tg:1:2:3", "--json"], runner.Requests.Single().Arguments);
+        Assert.Null(runner.Requests.Single().StandardInput);
+    }
+
+    [Fact]
+    public async Task Return_saved_like_a_note_when_the_hook_exists()
+    {
+        var (client, _) = Client(new ProcessResult(0, Fixtures.Read("note-created.json"), ""));
+
+        var result = await client.SaveReturnAsync("tg:1:2:3", CancellationToken.None);
+
+        Assert.Equal((ReturnOutcome.Saved, "created"), (result.Outcome, result.SavedOutcome));
+        Assert.True(result.IsSaved);
+    }
+
+    [Theory]
+    [InlineData(1, "", "fm-inbox: away mode is not on\n", FailureKind.ExitStatus, "away mode is not on")]
+    [InlineData(0, """{"schema":"fm-inbox-note.v1","outcome":"created"}""", "", FailureKind.Unparseable, "could not be read")]
+    public async Task Any_other_return_failure_is_reported_like_a_note_failure(int exitCode, string output, string error, FailureKind kind, string reason)
+    {
+        var (client, _) = Client(new ProcessResult(exitCode, output, error));
+
+        var result = await client.SaveReturnAsync("tg:1:2:3", CancellationToken.None);
+
+        Assert.Equal(ReturnOutcome.Failed, result.Outcome);
+        Assert.Equal(kind, result.Failure!.Kind);
+        Assert.Contains(reason, result.Failure.Reason);
+    }
+
     static (FirstMateClient Client, ScriptedProcessRunner Runner) Client(ProcessResult result)
     {
         var runner = new ScriptedProcessRunner(_ => result);

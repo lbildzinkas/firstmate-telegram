@@ -240,6 +240,34 @@ def cmd_receipts(args):
     })
 
 
+def cmd_return(args, fault):
+    """Today's FirstMate has no return subcommand (see Fixtures/return-unknown-subcommand.stderr).
+    A marker file fake/return-hook stands in for a FirstMate that gained the hook (spec 7.2.8):
+    it then records a distinct fixed-body note under a return request id."""
+    if not os.path.exists(os.path.join(FAKE, "return-hook")):
+        die("unknown subcommand: return (try --help)")
+    if len(args) != 3 or args[0] != "--request-id" or args[2] != "--json":
+        die("usage: fm-inbox.sh return [--request-id <id>] [--json]")
+    request_id = args[1]
+    body = "explicit return from Telegram (/back)\nThe user is back; run your return.\n"
+    reserved = os.path.join(REQUESTS, request_id)
+    os.makedirs(REQUESTS, exist_ok=True)
+    if os.path.exists(reserved):
+        with open(reserved) as source:
+            note_id = source.read().strip()
+        outcome = "replay"
+    else:
+        note_id = "%d-%s" % (time.time(), secrets.token_hex(3))
+        write_note(note_id, request_id, body)
+        with open(reserved, "w") as target:
+            target.write(note_id + "\n")
+        outcome = "created"
+    announced = announce(note_id, fault)
+    emit(note_result(outcome, note_id, request_id, announced))
+    if announced is False:
+        die("note %s is saved but firstmate was NOT woken" % note_id, 3)
+
+
 def cmd_ready(args):
     if args:
         die("usage: fm-inbox.sh ready")
@@ -261,6 +289,8 @@ def main():
         cmd_receipts(args[1:])
     elif subcommand == "ready":
         cmd_ready(args[1:])
+    elif subcommand == "return":
+        cmd_return(args[1:], next_fault("return"))
     else:
         die("unknown subcommand: %s (try --help)" % subcommand)
 

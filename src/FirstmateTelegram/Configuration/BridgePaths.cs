@@ -20,6 +20,7 @@ public sealed record BridgePaths(
     public string ConfigFile => Path.Combine(ConfigDirectory, "config.json");
     public string StateFile => Path.Combine(StateDirectory, "state.json");
     public string RequestsFile => Path.Combine(StateDirectory, "requests.json");
+    public string AlertsFile => Path.Combine(StateDirectory, "alerts.json");
     public string LockFile => Path.Combine(StateDirectory, "lock");
     public string LogFile => Path.Combine(LogDirectory, "bridge.log");
     public string LaunchdStandardOut => Path.Combine(LogDirectory, "launchd.out.log");

@@ -223,10 +223,15 @@ public sealed class FirstMateClient
         var snapshot = new FleetSnapshot(
             document.Tasks
                 .Select(task => new FleetTask(
+                    task.Id!,
                     task.Project,
                     string.IsNullOrWhiteSpace(task.Backlog?.Title) ? task.Id! : task.Backlog!.Title!,
                     task.CurrentState?.State,
-                    task.Kind == "secondmate"))
+                    task.Kind,
+                    task.Kind == "secondmate",
+                    task.Backlog?.Repo,
+                    task.Hints?.OpenDecisions?.Count ?? 0,
+                    task.Hints?.OpenDecisions is { Count: > 0 } decisions ? string.Join("\n", decisions.Select(decision => decision.GetRawText())) : ""))
                 .ToList(),
             document.Backlog.Records
                 .Where(record => record.Structured != false)
@@ -236,10 +241,31 @@ public sealed class FirstMateClient
                     record.State,
                     record.CaptainActionable == true,
                     record.HoldReason,
+                    record.Repo,
                     record.UnresolvedBlockerIds ?? [],
                     ParseTime(record.Completion?.Date)))
                 .ToList());
         return new FleetSnapshotResult(snapshot, null);
+    }
+
+    /// <summary><c>fm-inbox.sh return --request-id &lt;id&gt; --json</c>: the explicit-return hook <c>/back</c> needs (spec 7.2.8).</summary>
+    public async Task<ReturnSaveResult> SaveReturnAsync(string requestId, CancellationToken cancellationToken)
+    {
+        var result = await RunAsync(InboxScript, ["return", "--request-id", requestId, "--json"], _timeouts.Note, null, cancellationToken);
+        if (!result.Ran)
+            return new ReturnSaveResult(ReturnOutcome.Failed, null, null, RunFailure(result, InboxScript));
+        if (result.ExitCode == 1 && ReasonOf(result, InboxScript).StartsWith("unknown subcommand: return", StringComparison.Ordinal))
+            return new ReturnSaveResult(ReturnOutcome.NoHook, null, null, null);
+        if (result.ExitCode is not (0 or 3))
+            return new ReturnSaveResult(ReturnOutcome.Failed, null, null, ExitFailure(result, InboxScript));
+
+        var parsed = ParseNote(result.StandardOutput, InboxScript);
+        if (parsed.Failure is { } failure)
+            return new ReturnSaveResult(ReturnOutcome.Failed, null, null, failure);
+
+        var note = parsed.Note!;
+        var outcome = result.ExitCode == 0 ? ReturnOutcome.Saved : ReturnOutcome.SavedWithoutWake;
+        return new ReturnSaveResult(outcome, note.Id, note.Outcome, null);
     }
 
     Task<ProcessResult> RunAsync(string script, IReadOnlyList<string> arguments, TimeSpan timeout, string? input, CancellationToken cancellationToken)
@@ -299,15 +325,21 @@ public sealed class FirstMateClient
 
     static CallFailure ExitFailure(ProcessResult result, string script)
     {
+        var reason = ReasonOf(result, script);
+        if (reason.Length > 200)
+            reason = reason[..200];
+        return new CallFailure(FailureKind.ExitStatus, reason, result.ExitCode);
+    }
+
+    /// <summary>The first line of standard error, without FirstMate's <c>fm-inbox: </c> prefix.</summary>
+    static string ReasonOf(ProcessResult result, string script)
+    {
         var name = Path.GetFileName(script);
         var line = result.StandardError
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .FirstOrDefault();
-        var reason = line is null
-            ? $"{name} exited with status {result.ExitCode.ToString(CultureInfo.InvariantCulture)}"
-            : line.StartsWith("fm-inbox: ", StringComparison.Ordinal) ? line["fm-inbox: ".Length..] : line;
-        if (reason.Length > 200)
-            reason = reason[..200];
-        return new CallFailure(FailureKind.ExitStatus, reason, result.ExitCode);
+        if (line is null)
+            return string.Create(CultureInfo.InvariantCulture, $"{name} exited with status {result.ExitCode.ToString(CultureInfo.InvariantCulture)}");
+        return line.StartsWith("fm-inbox: ", StringComparison.Ordinal) ? line["fm-inbox: ".Length..] : line;
     }
 }

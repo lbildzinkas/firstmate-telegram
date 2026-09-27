@@ -38,4 +38,6 @@ Captured from the same commit's real `bin/fm-bearings-snapshot.sh` and `bin/fm-f
 
 The contract tests (`ContractTests.cs`) run all of `fm-inbox.sh`, `fm-bearings-snapshot.sh` and `fm-fleet-snapshot.sh` against the real scripts in a throwaway home when `FIRSTMATE_CONTRACT_ROOT` names a checkout.
 
+The fleet ledger has no captured fixture, because it is a file FirstMate's own events write, not a script's output: the ledger records the tests append (`Fakes/FakeFirstMateHome.AppendLedger`) follow the `v: 1` record contract in FirstMate's docs/fleet-ledger.md as summarized in spec 7.2.6, and `return-unknown-subcommand.stderr` above covers today's FirstMate refusing the return subcommand.
+
 The quota-axi fixtures live in `../quota-axi/`, all hand-derived from the spec's quota section: `quota-available.json` (42% left on the binding account scope), `quota-exhausted.json` and `quota-exhausted-no-reset.json` (runway `exhausted_now`), `quota-unknown-semantics.json`, `quota-keychain.json` (`keychain_prompt_required`), `quota-newer-schema.json` (`schemaVersion` 7) and `quota-missing-provider.json`.

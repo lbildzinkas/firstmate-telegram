@@ -79,10 +79,6 @@ public static partial class ConfigFile
         if (!BotReactions.Allowed.Contains(config.RepliedReaction))
             throw new BridgeException($"\"replied_reaction\" must be one of Telegram's bot reaction emoji: {string.Join(" ", BotReactions.Allowed)}");
 
-        // This version cannot yet hide private projects, so it refuses a deny list rather than leak one.
-        if (config.DenyList.Count > 0)
-            throw new BridgeException("\"deny_list\" is not supported by this version of firstmate-telegram yet; leave it empty ([]).");
-
         return config;
     }
 

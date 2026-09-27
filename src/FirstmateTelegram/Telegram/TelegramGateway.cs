@@ -26,7 +26,8 @@ public sealed record TelegramRetryOptions
 /// <summary>
 /// Every Telegram call: plain text with link previews off, replies threaded to the user's message, reactions, and
 /// retry with backoff (network errors and 5xx back off from 1 s to 60 s with jitter, 429 waits Telegram's
-/// <c>retry_after</c>, 409 logs once and backs off 30 s, 401 rechecks every 15 minutes).
+/// <c>retry_after</c>, 409 logs once and backs off 30 s, 401 rechecks every 15 minutes). The deny list is applied
+/// here, in one place, to every text the bridge sends (spec 6).
 /// </summary>
 public sealed class TelegramGateway
 {
@@ -34,16 +35,18 @@ public sealed class TelegramGateway
     readonly TimeProvider _time;
     readonly ILogger<TelegramGateway> _logger;
     readonly TelegramRetryOptions _options;
+    readonly Redactor _redactor;
     readonly Func<double> _random;
     int _tokenRejected;
     int _conflict;
 
-    public TelegramGateway(ITelegramBotClient client, TimeProvider time, ILogger<TelegramGateway> logger, TelegramRetryOptions? options = null, Func<double>? random = null)
+    public TelegramGateway(ITelegramBotClient client, TimeProvider time, ILogger<TelegramGateway> logger, TelegramRetryOptions? options = null, Func<double>? random = null, Redactor? redactor = null)
     {
         _client = client;
         _time = time;
         _logger = logger;
         _options = options ?? new TelegramRetryOptions();
+        _redactor = redactor ?? Redactor.None;
         _random = random ?? Random.Shared.NextDouble;
     }
 
@@ -59,18 +62,37 @@ public sealed class TelegramGateway
             bestEffort: false,
             cancellationToken))!;
 
-    /// <summary>Sends plain text, retrying until Telegram accepts it. Returns the sent message's id.</summary>
-    public async Task<int> SendTextAsync(long chatId, string text, int? replyToMessageId, CancellationToken cancellationToken)
+    /// <summary>Sends plain text, retrying until Telegram accepts it. Returns the sent message's id. Alerts pass <paramref name="silent"/> while a mute is on; a mute never drops them.</summary>
+    public async Task<int> SendTextAsync(long chatId, string text, int? replyToMessageId, bool silent = false, CancellationToken cancellationToken = default)
     {
-        var sent = await CallAsync("sendMessage", token => Send(chatId, text, replyToMessageId, token), _options.CallTimeout, bestEffort: false, cancellationToken);
+        var sent = await CallAsync("sendMessage", token => Send(chatId, text, replyToMessageId, silent, token), _options.CallTimeout, bestEffort: false, cancellationToken);
         return sent!.Id;
     }
 
     /// <summary>Sends plain text with a few attempts; a failure is logged and skipped.</summary>
     public async Task<bool> TrySendTextAsync(long chatId, string text, int? replyToMessageId, CancellationToken cancellationToken)
     {
-        var sent = await CallAsync("sendMessage", token => Send(chatId, text, replyToMessageId, token), _options.CallTimeout, bestEffort: true, cancellationToken);
+        var sent = await CallAsync("sendMessage", token => Send(chatId, text, replyToMessageId, silent: false, token), _options.CallTimeout, bestEffort: true, cancellationToken);
         return sent is not null;
+    }
+
+    /// <summary>Registers the bridge's command list for one chat only, so Telegram's command menu shows it there and nowhere else. Best-effort.</summary>
+    public async Task<bool> TrySetMyCommandsAsync(long chatId, IReadOnlyList<(string Command, string Description)> commands, CancellationToken cancellationToken)
+    {
+        var done = await CallAsync(
+            "setMyCommands",
+            token =>
+            {
+                _client.SetMyCommands(
+                    commands.Select(command => new BotCommand { Command = command.Command, Description = command.Description }),
+                    scope: new BotCommandScopeChat { ChatId = chatId },
+                    cancellationToken: token);
+                return Task.FromResult(true);
+            },
+            _options.CallTimeout,
+            bestEffort: true,
+            cancellationToken);
+        return done;
     }
 
     /// <summary>Replaces the bot's reaction on a message with <paramref name="emoji"/>; a failure is logged and skipped.</summary>
@@ -89,12 +111,13 @@ public sealed class TelegramGateway
         return done;
     }
 
-    Task<Message> Send(long chatId, string text, int? replyToMessageId, CancellationToken cancellationToken) =>
+    Task<Message> Send(long chatId, string text, int? replyToMessageId, bool silent, CancellationToken cancellationToken) =>
         _client.SendMessage(
             chatId,
-            text,
+            _redactor.Apply(text),
             replyParameters: replyToMessageId is { } messageId ? new ReplyParameters { MessageId = messageId, AllowSendingWithoutReply = true } : null,
             linkPreviewOptions: new LinkPreviewOptions { IsDisabled = true },
+            disableNotification: silent,
             cancellationToken: cancellationToken);
 
     async Task<T?> CallAsync<T>(string method, Func<CancellationToken, Task<T>> call, TimeSpan timeout, bool bestEffort, CancellationToken cancellationToken)

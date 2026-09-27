@@ -147,6 +147,25 @@ public static class DoctorCommand
         checks.Add(receipts.Failure is { } receiptsFailure
             ? new("FirstMate receipts", false, receiptsFailure.Reason)
             : new("FirstMate receipts", true, FirstMateClient.ReceiptsSchema));
+
+        checks.Add(CheckFleetLedger(config));
+    }
+
+    /// <summary>The ledger is opt-in and off by default; the bridge never creates the flag (spec 7.1).</summary>
+    static DoctorCheck CheckFleetLedger(BridgeConfig config)
+    {
+        var flag = Path.Combine(config.FirstmateHome, "config", "fleet-ledger");
+        if (!File.Exists(flag))
+            return new("fleet ledger", false, "off. Create an empty file config/fleet-ledger in the FirstMate home to turn on FirstMate's fleet ledger; without it only decision alerts work.");
+
+        var ledger = new FleetLedger(config.FirstmateHome);
+        if (!File.Exists(ledger.FilePath))
+            return new("fleet ledger", true, "on; no events recorded yet");
+
+        var read = ledger.Read(new LedgerPosition(0, 0, 0));
+        return read is { SkippedOtherVersions: > 0 } skipped
+            ? new("fleet ledger", true, $"on; skipped {skipped.SkippedOtherVersions.ToString(CultureInfo.InvariantCulture)} record(s) with a newer format")
+            : new("fleet ledger", true, "on");
     }
 
     static async Task CheckServiceAsync(LocalEnvironment environment, List<DoctorCheck> checks, CancellationToken cancellationToken)

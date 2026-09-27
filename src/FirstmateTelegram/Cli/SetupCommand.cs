@@ -65,6 +65,8 @@ public static class SetupCommand
         console.WriteLine();
         console.WriteLine("Optional next steps:");
         console.WriteLine($"- In BotFather, turn off \"Allow Groups\" for @{me.Username} (Bot Settings > Allow Groups), so the bot cannot be added to groups.");
+        console.WriteLine("- To get alerts from FirstMate's records, turn on FirstMate's fleet ledger: create an empty file config/fleet-ledger in the FirstMate home.");
+        console.WriteLine("- To see model quota in /ping, authorise quota-axi once in a terminal with `quota-axi --allow-keychain-prompt` and choose \"Always Allow\".");
         console.WriteLine("- To have FirstMate itself hold the phone to a lower authority, add this line to data/captain.md in your FirstMate home:");
         console.WriteLine($"  {CaptainPreference}");
 

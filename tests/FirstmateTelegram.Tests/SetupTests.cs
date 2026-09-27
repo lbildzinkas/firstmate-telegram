@@ -136,6 +136,7 @@ public sealed class DoctorTests
     public async Task Doctor_passes_when_everything_is_in_place()
     {
         await using var harness = await BridgeHarness.StartAsync();
+        harness.FirstMate.TurnOnFleetLedger();
         RunCommandTests.WriteConfigAndToken(harness);
         using var tools = FakeTools();
         var console = new ScriptedConsole();
@@ -146,8 +147,29 @@ public sealed class DoctorTests
         Assert.Contains($"bot token: accepted for @{FakeTelegramServer.BotUsername}", console.Output);
         Assert.Contains("FirstMate ready: fm-primary-ready.v1: running, listening, posture present", console.Output);
         Assert.Contains("FirstMate receipts: fm-inbox-receipts.v1", console.Output);
+        Assert.Contains("fleet ledger: on", console.Output);
         Assert.Contains("Everything checks out.", console.Output);
         Assert.All(harness.Telegram.CallsTo("getUpdates"), call => Assert.Null(call["offset"]));
+    }
+
+    [Fact]
+    public async Task Doctor_says_when_the_fleet_ledger_flag_is_missing_and_counts_newer_records()
+    {
+        await using var harness = await BridgeHarness.StartAsync();
+        RunCommandTests.WriteConfigAndToken(harness);
+        using var tools = FakeTools();
+        var console = new ScriptedConsole();
+
+        await DoctorCommand.RunAsync(Local(harness, console, tools, new FakeServiceInstaller { IsInstalled = true, IsLoaded = true }), CancellationToken.None);
+        Assert.Contains("PROBLEM  fleet ledger: off. Create an empty file config/fleet-ledger", console.Output);
+
+        harness.FirstMate.TurnOnFleetLedger();
+        harness.FirstMate.AppendLedger(
+            """{"v":1,"ts":"2026-09-26T14:10:00Z","event":"task.pr_ready","task":"t","pr":"https://github.com/acme/webapp/pull/7"}""",
+            """{"v":2,"ts":"2026-09-26T14:11:00Z","event":"task.status","task":"t","state":"failed"}""");
+        console = new ScriptedConsole();
+        await DoctorCommand.RunAsync(Local(harness, console, tools, new FakeServiceInstaller { IsInstalled = true, IsLoaded = true }), CancellationToken.None);
+        Assert.Contains("fleet ledger: on; skipped 1 record(s) with a newer format", console.Output);
     }
 
     [Fact]

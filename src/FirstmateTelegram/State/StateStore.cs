@@ -18,8 +18,8 @@ public sealed class AtomicStateWriter : IStateWriter
 }
 
 /// <summary>
-/// The bridge's own state (<c>state.json</c>) and request map (<c>requests.json</c>), held in memory and written
-/// through on every change, with one writer at a time.
+/// The bridge's own state (<c>state.json</c>), request map (<c>requests.json</c>) and alert history (<c>alerts.json</c>),
+/// held in memory and written through on every change, with one writer at a time.
 /// </summary>
 public sealed class StateStore : IDisposable
 {
@@ -27,12 +27,13 @@ public sealed class StateStore : IDisposable
     readonly IStateWriter _writer;
     readonly SemaphoreSlim _gate = new(1, 1);
 
-    StateStore(BridgePaths paths, IStateWriter writer, BridgeState state, ImmutableDictionary<string, RequestEntry> requests)
+    StateStore(BridgePaths paths, IStateWriter writer, BridgeState state, ImmutableDictionary<string, RequestEntry> requests, ImmutableDictionary<string, AlertEntry> alerts)
     {
         _paths = paths;
         _writer = writer;
         State = state;
         Requests = requests;
+        Alerts = alerts;
     }
 
     public BridgeState State { get; private set; }
@@ -40,12 +41,17 @@ public sealed class StateStore : IDisposable
     /// <summary>The request map, keyed by FirstMate note id.</summary>
     public ImmutableDictionary<string, RequestEntry> Requests { get; private set; }
 
+    /// <summary>The alert history, keyed by dedupe key.</summary>
+    public ImmutableDictionary<string, AlertEntry> Alerts { get; private set; }
+
     public static StateStore Open(BridgePaths paths, IStateWriter? writer = null)
     {
         var state = Read(paths.StateFile, StateJsonContext.Default.BridgeState, BridgeState.SchemaName, document => document.Schema) ?? new BridgeState();
         var requests = Read(paths.RequestsFile, StateJsonContext.Default.RequestsDocument, RequestsDocument.SchemaName, document => document.Schema) ?? new RequestsDocument();
-        var map = requests.Requests.ToImmutableDictionary(entry => entry.NoteId, StringComparer.Ordinal);
-        return new StateStore(paths, writer ?? new AtomicStateWriter(), state, map);
+        var alerts = Read(paths.AlertsFile, StateJsonContext.Default.AlertsDocument, AlertsDocument.SchemaName, document => document.Schema) ?? new AlertsDocument();
+        var requestMap = requests.Requests.ToImmutableDictionary(entry => entry.NoteId, StringComparer.Ordinal);
+        var alertMap = alerts.Alerts.ToImmutableDictionary(entry => entry.Key, StringComparer.Ordinal);
+        return new StateStore(paths, writer ?? new AtomicStateWriter(), state, requestMap, alertMap);
     }
 
     public async Task UpdateStateAsync(Func<BridgeState, BridgeState> change, CancellationToken cancellationToken = default)
@@ -80,6 +86,27 @@ public sealed class StateStore : IDisposable
             var document = new RequestsDocument { Requests = [.. next.Values.OrderBy(entry => entry.SavedAt).ThenBy(entry => entry.NoteId, StringComparer.Ordinal)] };
             Persist(_paths.RequestsFile, document, StateJsonContext.Default.RequestsDocument);
             Requests = next;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task UpdateAlertsAsync(
+        Func<ImmutableDictionary<string, AlertEntry>, ImmutableDictionary<string, AlertEntry>> change,
+        CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var next = change(Alerts);
+            if (ReferenceEquals(next, Alerts))
+                return;
+
+            var document = new AlertsDocument { Alerts = [.. next.Values.OrderBy(entry => entry.At).ThenBy(entry => entry.Key, StringComparer.Ordinal)] };
+            Persist(_paths.AlertsFile, document, StateJsonContext.Default.AlertsDocument);
+            Alerts = next;
         }
         finally
         {

@@ -77,10 +77,11 @@ public sealed class BridgeInstance : IDisposable
     {
         Store = StateStore.Open(harness.Paths, writer);
         var client = new TelegramClientFactory(harness.Telegram.BaseUrl).Create(FakeTelegramServer.Token);
-        Gateway = new TelegramGateway(client, time, harness.Logging.For<TelegramGateway>(), harness.Retry, random: () => 0.5);
+        var redactor = new Redactor(harness.Config.DenyList);
+        Gateway = new TelegramGateway(client, time, harness.Logging.For<TelegramGateway>(), harness.Retry, random: () => 0.5, redactor: redactor);
         var firstMate = new FirstMateClient(new SystemProcessRunner(), harness.Config.FirstmateHome, harness.Timeouts);
-        // Tests never run the real quota-axi, even on a machine that has it; the named binary does not exist.
-        var quota = new QuotaReader(new SystemProcessRunner(), harness.Config.QuotaProvider, "quota-axi-not-installed-for-tests");
+        // The fake quota-axi prints a captured snapshot when a test sets one, and fails as a missing tool otherwise.
+        var quota = new QuotaReader(new SystemProcessRunner(), harness.Config.QuotaProvider, harness.FirstMate.QuotaBinary);
         Availability = new AvailabilityReader(
             firstMate,
             quota,
@@ -89,8 +90,10 @@ public sealed class BridgeInstance : IDisposable
             TimeSpan.FromMinutes(harness.Config.UnresponsiveAfterMinutes),
             QuotaReader.ProviderDisplay(harness.Config.QuotaProvider),
             harness.Logging.For<AvailabilityReader>());
-        Status = new StatusRenderer(firstMate, time, harness.Logging.For<StatusRenderer>());
+        Status = new StatusRenderer(firstMate, time, harness.Logging.For<StatusRenderer>(), redactor);
         Submitter = new RequestSubmitter(firstMate, Gateway, Store, _replyWaiting, time, harness.Logging.For<RequestSubmitter>());
+        Sender = new AlertSender(Gateway, Store, time, harness.Logging.For<AlertSender>());
+        Stopper = new RecordingStopper();
         Poller = new UpdatePoller(
             Gateway,
             Store,
@@ -100,10 +103,13 @@ public sealed class BridgeInstance : IDisposable
                 Availability,
                 Status,
                 Submitter,
+                Store,
+                time,
                 TimeSpan.FromSeconds(harness.Config.LivePingTimeoutSeconds)),
             Submitter,
             time,
-            harness.Logging.For<UpdatePoller>());
+            harness.Logging.For<UpdatePoller>(),
+            Stopper);
         Forwarder = new ReplyForwarder(
             firstMate,
             Gateway,
@@ -113,6 +119,24 @@ public sealed class BridgeInstance : IDisposable
             Availability,
             time,
             harness.Logging.For<ReplyForwarder>());
+        Alerts = new AlertWatcher(
+            firstMate,
+            new FleetLedger(harness.Config.FirstmateHome),
+            Sender,
+            Store,
+            redactor,
+            time,
+            TimeSpan.FromMinutes(harness.Config.AlertSettleMinutes),
+            harness.Config.AllowedUserId,
+            harness.Logging.For<AlertWatcher>());
+        Monitor = new AvailabilityMonitor(
+            Availability,
+            Sender,
+            Store,
+            time,
+            QuotaReader.ProviderDisplay(harness.Config.QuotaProvider),
+            harness.Config.AllowedUserId,
+            harness.Logging.For<AvailabilityMonitor>());
     }
 
     public StateStore Store { get; }
@@ -125,9 +149,17 @@ public sealed class BridgeInstance : IDisposable
 
     public RequestSubmitter Submitter { get; }
 
+    public AlertSender Sender { get; }
+
+    public RecordingStopper Stopper { get; }
+
     public UpdatePoller Poller { get; }
 
     public ReplyForwarder Forwarder { get; }
+
+    public AlertWatcher Alerts { get; }
+
+    public AvailabilityMonitor Monitor { get; }
 
     public async Task<BridgeInstance> InitializedAsync()
     {
@@ -139,13 +171,29 @@ public sealed class BridgeInstance : IDisposable
 
     public Task ForwardAsync() => Forwarder.ForwardOnceAsync(CancellationToken.None);
 
+    public Task WatchAsync() => Alerts.WatchOnceAsync(CancellationToken.None);
+
+    public Task CheckAvailabilityAsync() => Monitor.CheckOnceAsync(CancellationToken.None);
+
     public void Dispose()
     {
         Poller.Dispose();
         Forwarder.Dispose();
+        Alerts.Dispose();
+        Monitor.Dispose();
         Store.Dispose();
         _replyWaiting.Dispose();
     }
+}
+
+/// <summary>Records a /stop so tests can assert the bridge was asked to exit without running a host.</summary>
+public sealed class RecordingStopper : IBridgeStopper
+{
+    public int Stops { get; private set; }
+
+    public bool WasAskedToStop => Stops > 0;
+
+    public void StopBridge() => Stops++;
 }
 
 /// <summary>A state writer that simulates the process dying just before a chosen write, once it is armed.</summary>
