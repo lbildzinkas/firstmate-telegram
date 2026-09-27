@@ -16,7 +16,8 @@ public sealed record SubmitResult(string? NoteId, CallFailure? Failure)
 
 /// <summary>
 /// Saves a request as a FirstMate inbox note, records it in the request map, reacts 👀, says once when FirstMate
-/// is not running or not picking up requests, and repairs the wake for notes saved without one.
+/// is not running or not picking up requests, and repairs the wake for notes saved without one. A live ping goes
+/// through the same path with its own body and a deadline instead of the queued notice.
 /// </summary>
 public sealed class RequestSubmitter
 {
@@ -47,26 +48,13 @@ public sealed class RequestSubmitter
             return new SubmitResult(null, saved.Failure);
 
         var noteId = saved.NoteId!;
-        var announced = saved.Status == NoteSaveStatus.Saved;
-        await _store.UpdateRequestsAsync(
-            requests => requests.TryGetValue(noteId, out var existing)
-                ? requests.SetItem(noteId, existing with { Announced = existing.Announced || announced })
-                : requests.SetItem(noteId, new RequestEntry
-                {
-                    NoteId = noteId,
-                    RequestId = requestId,
-                    ChatId = chatId,
-                    MessageId = message.Id,
-                    SavedAt = _time.GetUtcNow(),
-                    Announced = announced,
-                }),
-            cancellationToken);
+        await RecordAsync(message, bot, requestId, noteId, RequestKinds.Request, saved.Status == NoteSaveStatus.Saved, deadline: null, cancellationToken);
         _logger.LogInformation(
             "saved message {MessageId} as note {NoteId} ({Outcome}{Wake})",
             message.Id,
             noteId,
             saved.Outcome,
-            announced ? "" : ", not announced");
+            saved.Status == NoteSaveStatus.Saved ? "" : ", not announced");
         _replyWaiting.Set();
 
         await _telegram.TrySetReactionAsync(chatId, message.Id, BotReactions.Received, cancellationToken);
@@ -81,10 +69,56 @@ public sealed class RequestSubmitter
         return new SubmitResult(noteId, null);
     }
 
+    /// <summary>Saves the live ping's short availability-check note and tells the user FirstMate is being asked directly.</summary>
+    public async Task<SubmitResult> SubmitLivePingAsync(Message message, BotIdentity bot, bool isAway, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        var chatId = message.Chat.Id;
+        var requestId = RequestIds.For(bot.Id, chatId, message.Id);
+        var saved = await _firstMate.SaveNoteAsync(requestId, NoteBody.Build(BridgeTexts.LivePingBody, isAway), cancellationToken);
+        if (!saved.IsSaved)
+            return new SubmitResult(null, saved.Failure);
+
+        var noteId = saved.NoteId!;
+        await RecordAsync(message, bot, requestId, noteId, RequestKinds.LivePing, saved.Status == NoteSaveStatus.Saved, _time.GetUtcNow() + timeout, cancellationToken);
+        _logger.LogInformation(
+            "saved the live ping for message {MessageId} as note {NoteId} ({Outcome}{Wake})",
+            message.Id,
+            noteId,
+            saved.Outcome,
+            saved.Status == NoteSaveStatus.Saved ? "" : ", not announced");
+        _replyWaiting.Set();
+
+        await _telegram.TrySetReactionAsync(chatId, message.Id, BotReactions.Received, cancellationToken);
+        await _telegram.TrySendTextAsync(chatId, BridgeTexts.AskingFirstMate((int)Math.Round(timeout.TotalSeconds)), message.Id, cancellationToken);
+        return new SubmitResult(noteId, null);
+    }
+
+    async Task RecordAsync(Message message, BotIdentity bot, string requestId, string noteId, string kind, bool announced, DateTimeOffset? deadline, CancellationToken cancellationToken)
+    {
+        var chatId = message.Chat.Id;
+        await _store.UpdateRequestsAsync(
+            requests => requests.TryGetValue(noteId, out var existing)
+                ? requests.SetItem(noteId, existing with { Announced = existing.Announced || announced })
+                : requests.SetItem(noteId, new RequestEntry
+                {
+                    NoteId = noteId,
+                    RequestId = requestId,
+                    ChatId = chatId,
+                    MessageId = message.Id,
+                    Kind = kind,
+                    SavedAt = _time.GetUtcNow(),
+                    Announced = announced,
+                    LiveDeadlineAt = deadline,
+                }),
+            cancellationToken);
+    }
+
     /// <summary>Runs <c>announce</c> for every note that was saved without waking FirstMate. It never saves a second note.</summary>
     public async Task RepairWakesAsync(CancellationToken cancellationToken)
     {
-        var unannounced = _store.Requests.Values.Where(entry => !entry.Announced && entry.IsWaitingForReply).ToList();
+        var unannounced = _store.Requests.Values
+            .Where(entry => !entry.Announced && (entry.IsWaitingForReply || entry.IsLivePingOpen))
+            .ToList();
         foreach (var entry in unannounced)
         {
             var repair = await _firstMate.AnnounceAsync(entry.NoteId, cancellationToken);

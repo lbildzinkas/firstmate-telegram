@@ -1,0 +1,1 @@
+{"schemaVersion":7,"providers":[{"name":"claude","state":{"status":"ok"},"quotaSemantics":{"status":"ok","effectiveAvailability":[{"scope":"account","status":"ok","effectivePercentRemaining":50,"runway":{"status":"ok"},"limitingWindowIds":[]}]},"windows":[]}]}

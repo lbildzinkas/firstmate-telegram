@@ -26,3 +26,13 @@ Derived by hand, because a throwaway home cannot hold a live session lock. Each 
 | `ready-running-away.json` | lock held, wake consumer healthy, away |
 | `ready-not-picking-up.json` | lock held, wake consumer down |
 | `ready-listening-unconfirmed.json` | lock held, wake consumer unknown |
+
+Also derived by hand, because the checkout at `e9a6675` was not at hand when the status answer was built. Each follows the field tables the spec carries for these commands (docs/spec.md sections 7.2.5 and 7.2.7); when FirstMate's real outputs are captured, replace these and keep the names:
+
+| File | Shape |
+| --- | --- |
+| `bearings.json` | `fm-bearings.v1` with the spec's `/status` example: one decision, one PR to review, one landed item, one task under way, one gate |
+| `bearings-many.json` | `fm-bearings.v1` with finished scout research, no decisions, 10 landed items and 10 gates, to exercise the eight-item cap and "+N more" |
+| `fleet-snapshot.json` | `fm-fleet-snapshot.v1` with one captain-actionable hold, one done record, one task under way, one second-mate task, one queued record blocked by another |
+
+The quota-axi fixtures live in `../quota-axi/`, all hand-derived from the spec's quota section: `quota-available.json` (42% left on the binding account scope), `quota-exhausted.json` and `quota-exhausted-no-reset.json` (runway `exhausted_now`), `quota-unknown-semantics.json`, `quota-keychain.json` (`keychain_prompt_required`), `quota-newer-schema.json` (`schemaVersion` 7) and `quota-missing-provider.json`.

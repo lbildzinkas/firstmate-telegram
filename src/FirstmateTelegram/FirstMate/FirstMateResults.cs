@@ -34,7 +34,7 @@ public sealed record NoteSaveResult(NoteSaveStatus Status, string? NoteId, strin
 
 public sealed record WakeRepairResult(bool Repaired, CallFailure? Failure);
 
-public sealed record InboxReply(string NoteId, string Body, string Cursor);
+public sealed record InboxReply(string NoteId, string Body, string Cursor, DateTimeOffset? At);
 
 public sealed record InboxReceipts(
     IReadOnlyList<InboxReply> Replies,
@@ -53,3 +53,43 @@ public sealed record ReadyResult(ReadyReading? Reading, CallFailure? Failure)
 {
     public bool IsAway => Reading?.PostureState == "away";
 }
+
+/// <summary>What <c>receipts --all-pending</c> says about the notes FirstMate has not handled yet.</summary>
+public sealed record PendingNotes(DateTimeOffset? OldestUnacknowledgedAt);
+
+public sealed record PendingResult(PendingNotes? Notes, CallFailure? Failure);
+
+public sealed record BearingsWork(string Name, string? State, string? Doing, string? Repo, string? Kind);
+
+public sealed record RecordedPr(string Task, string? Url);
+
+public sealed record LandedWork(string What, string? Artifact);
+
+public sealed record WorkGate(string Title, string? BlockedBy, string? Reason);
+
+/// <summary>The four-part bearings projection, <c>fm-bearings.v1</c>.</summary>
+public sealed record BearingsSnapshot(
+    IReadOnlyList<string> OpenDecisions,
+    IReadOnlyList<BearingsWork> InFlight,
+    IReadOnlyList<RecordedPr> RecordedPrs,
+    IReadOnlyList<LandedWork> Landed,
+    IReadOnlyList<WorkGate> Gates);
+
+/// <summary>A bearings read. <see cref="AwayRefused"/> is FirstMate's exit 3: away mode refuses the projection, and the fleet snapshot is used instead.</summary>
+public sealed record BearingsResult(BearingsSnapshot? Snapshot, bool AwayRefused, CallFailure? Failure);
+
+public sealed record FleetTask(string? Project, string? Title, string? State, bool SecondMate);
+
+public sealed record FleetRecord(
+    string? Id,
+    string Title,
+    string? State,
+    bool CaptainActionable,
+    string? HoldReason,
+    IReadOnlyList<string> UnresolvedBlockerIds,
+    DateTimeOffset? UpdatedAt);
+
+/// <summary>The canonical fleet snapshot, <c>fm-fleet-snapshot.v1</c>, used for the status answer while away mode is on.</summary>
+public sealed record FleetSnapshot(IReadOnlyList<FleetTask> Tasks, IReadOnlyList<FleetRecord> Records);
+
+public sealed record FleetSnapshotResult(FleetSnapshot? Snapshot, CallFailure? Failure);

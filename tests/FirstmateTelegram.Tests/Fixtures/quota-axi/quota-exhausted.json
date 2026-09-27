@@ -1,0 +1,1 @@
+{"schemaVersion":5,"providers":[{"name":"claude","state":{"status":"ok"},"quotaSemantics":{"status":"degraded","effectiveAvailability":[{"scope":"account","status":"limited","effectivePercentRemaining":0,"runway":{"status":"exhausted_now"},"limitingWindowIds":["w-daily"]}]},"windows":[{"id":"w-daily","resetsAt":"2026-09-26T21:40:00Z"}]}]}
