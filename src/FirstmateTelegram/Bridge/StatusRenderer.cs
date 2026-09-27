@@ -133,7 +133,7 @@ public sealed class StatusRenderer
             .Where(record => record.State == "done")
             .OrderByDescending(record => record.CompletedAt)
             .Take(LandedFromFleet)
-            .Select(record => record.Title)
+            .Select(record => _redactor.IsDenied(record.Repo) ? Redactor.Mask : record.Title)
             .ToList();
         var underWay = snapshot.Tasks
             .Where(task => !task.SecondMate)

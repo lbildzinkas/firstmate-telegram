@@ -84,6 +84,23 @@ public sealed class DenyListTests
     }
 
     [Fact]
+    public async Task A_fleet_status_answer_masks_a_denied_repo_in_the_landed_rows_too()
+    {
+        await using var harness = await BridgeHarness.StartAsync();
+        harness.Config = harness.Config with { DenyList = ["acme/webapp"] };
+        harness.FirstMate.SetReady("ready-running-away.json");
+        harness.FirstMate.Script("bearings", new { exit = 3, stderr = "away mode is on" });
+        harness.Telegram.EnqueueText(BridgeHarness.UserId, "/status");
+        var bridge = await harness.StartInstance().InitializedAsync();
+
+        await bridge.PollAsync();
+
+        var sent = Assert.Single(harness.Telegram.SentMessages()).Text;
+        Assert.Contains("Recently landed (1)\n• a private project", sent);
+        Assert.DoesNotContain("Docs refresh", sent);
+    }
+
+    [Fact]
     public async Task A_pr_alert_for_a_private_project_names_no_title_repo_or_link()
     {
         await using var harness = await BridgeHarness.StartAsync();
