@@ -19,7 +19,6 @@ public static class MuteDurations
 
         var total = TimeSpan.Zero;
         var position = 0;
-        var unitsSeen = 0;
         while (position < arguments.Length)
         {
             var digits = position;
@@ -41,13 +40,12 @@ public static class MuteDurations
 
             if (!int.TryParse(arguments[position..digits], CultureInfo.InvariantCulture, out var amount) || amount <= 0)
                 return null;
+            if (amount > Maximum.Ticks / length.Value.Ticks || total + length.Value * amount > Maximum)
+                return null;
             total += length.Value * amount;
-            unitsSeen++;
             position = digits + 1;
         }
 
-        if (unitsSeen == 0 || total <= TimeSpan.Zero || total > Maximum)
-            return null;
         return total;
     }
 }

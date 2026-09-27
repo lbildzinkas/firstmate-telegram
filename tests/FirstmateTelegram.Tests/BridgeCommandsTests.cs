@@ -36,6 +36,10 @@ public sealed class BridgeCommandsTests
     [InlineData("1h 30")]
     [InlineData("-1h")]
     [InlineData("1.5h")]
+    [InlineData("10081m")]
+    [InlineData("20000000d")]
+    [InlineData("300000000h")]
+    [InlineData("5000000d5000000d5000000d")]
     public void Anything_beyond_the_allowed_units_or_the_maximum_does_not_parse(string arguments)
     {
         Assert.Null(MuteDurations.Parse(arguments));
