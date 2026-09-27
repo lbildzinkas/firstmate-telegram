@@ -863,14 +863,16 @@ flowchart LR
   CR --> SR[StatusRenderer]
   CR --> AM[AvailabilityMonitor]
   RF[ReplyForwarder] --> GW
-  AW[AlertWatcher] --> GW
-  AM --> GW
+  AW[AlertWatcher] --> AS[AlertSender]
+  AM --> AS
+  AS --> GW
   RS --> FC[FirstMateClient]
   RF --> FC
   AW --> FC
   AM --> FC
   SR --> FC
   FC --> FM[("FirstMate home: fm-inbox.sh, snapshots, ledger")]
+  AW --> FL[FleetLedger] --> FM
   AM --> QR[QuotaReader] --> QA[quota-axi]
   UP --> SS[(StateStore)]
   RF --> SS
@@ -885,12 +887,14 @@ flowchart LR
 | `CommandRouter` | Parses and runs the commands in 4.3. |
 | `RequestSubmitter` | Builds the note body and footer, calls `note`, reacts 👀, and repairs missed wakes. |
 | `ReplyForwarder` (background service) | Polls `receipts`, sends replies and the replied reaction, and completes live pings. |
-| `AlertWatcher` (background service) | Tails the ledger, compares successive decision lists, applies the settle window and dedupe, and sends alerts. |
+| `AlertWatcher` (background service) | Tails the ledger, compares successive decision lists, applies the settle window and dedupe, and sends alerts through `AlertSender`. |
 | `AvailabilityMonitor` (background service) | Polls `ready` and quota, computes the `/ping` verdict, and sends availability alerts in away mode. |
+| `AlertSender` | Sends an alert exactly once per dedupe key: the key is written to the history before the send and the Telegram message id after (8.3). A mute makes its sends silent, never dropped. |
 | `StatusRenderer` | Turns bearings or fleet snapshot JSON into the four-part answer. |
 | `Redactor` | Applies the deny list to all outbound text, in one place inside `TelegramGateway`. |
 | `TelegramGateway` | Every Telegram call: splitting, threading, silent sends while muted, link previews off, reactions, retry and backoff. |
-| `FirstMateClient` | Runs FirstMate's scripts without a shell, with timeouts, `FM_HOME` set and message bodies on standard input. Parses and version-checks their JSON, and reads the ledger file. |
+| `FirstMateClient` | Runs FirstMate's scripts without a shell, with timeouts, `FM_HOME` set and message bodies on standard input. Parses and version-checks their JSON. |
+| `FleetLedger` | Reads the fleet activity ledger file from the stored byte offset and file identity, complete lines only (7.2.6). |
 | `QuotaReader` | Runs `quota-axi` and interprets its output. |
 | `StateStore` | Atomic JSON state and the single-instance lock, with one writer at a time. |
 | `IServiceInstaller`, `LaunchdServiceInstaller` | Plist generation and `launchctl` calls. |
