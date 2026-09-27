@@ -5,9 +5,13 @@ namespace FirstmateTelegram.Tests;
 
 public sealed class LoggingTests
 {
+    public static TheoryData<string> TokenShapedLines()
+        => new(
+            "POST https://api.telegram.org/bot" + FakeTokens.Telegram() + "/getUpdates failed",
+            "token " + FakeTokens.Telegram(7012345678, "AAE_", "abcdefghijklmnopqrstuvwxyz012345") + " in text");
+
     [Theory]
-    [InlineData("POST https://api.telegram.org/bot123456789:AAHfakeTokenForTestsOnly-0123456789ab/getUpdates failed")]
-    [InlineData("token 7012345678:AAE_abcdefghijklmnopqrstuvwxyz012345 in text")]
+    [MemberData(nameof(TokenShapedLines))]
     public void Anything_shaped_like_a_bot_token_is_masked(string line)
     {
         var masked = TokenMask.Apply(line);
@@ -30,9 +34,9 @@ public sealed class LoggingTests
         using var directory = new TempDirectory();
         var path = directory.Combine("logs", "bridge.log");
         using (var log = new BridgeLogFile(path))
-            log.Write("failed at https://api.telegram.org/bot123456789:AAHfakeTokenForTestsOnly-0123456789ab/sendMessage");
+            log.Write("failed at https://api.telegram.org/bot" + FakeTokens.Telegram() + "/sendMessage");
 
-        Assert.DoesNotContain("AAHfakeToken", File.ReadAllText(path));
+        Assert.DoesNotContain(FakeTokens.Telegram(), File.ReadAllText(path));
         Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(path));
     }
 

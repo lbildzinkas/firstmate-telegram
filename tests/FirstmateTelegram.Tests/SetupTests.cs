@@ -49,7 +49,7 @@ public sealed class SetupTests
     {
         await using var harness = await BridgeHarness.StartAsync();
         harness.Telegram.EnqueueText(BridgeHarness.UserId, "pair me");
-        var console = new ScriptedConsole("not a token", "123456789:AAHrevokedTokenForTests-0000000000", FakeTelegramServer.Token, harness.FirstMate.Home, "y");
+        var console = new ScriptedConsole("not a token", FakeTokens.RevokedTelegram(), FakeTelegramServer.Token, harness.FirstMate.Home, "y");
 
         Assert.Equal(0, await SetupCommand.RunAsync(Local(harness, console, new FakeServiceInstaller()), CancellationToken.None));
 
