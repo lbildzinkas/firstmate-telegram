@@ -240,7 +240,7 @@ public sealed class AlertWatcher : BackgroundService
             updated[id] = new DecisionWatch(firstSeen, 0);
             if (!firstRead)
             {
-                await _store.UpdateStateAsync(state => state with { Decisions = updated }, cancellationToken);
+                await _store.UpdateStateAsync(state => state with { Decisions = updated.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal) }, cancellationToken);
                 var text = _redactor.IsDenied(record.Repo)
                     ? BridgeTexts.DecisionPrivateAlert
                     : string.IsNullOrWhiteSpace(record.HoldReason)

@@ -133,6 +133,30 @@ public sealed class AlertTests
     }
 
     [Fact]
+    public async Task Two_new_holds_in_one_snapshot_are_both_on_record_across_a_restart()
+    {
+        await using var harness = await BridgeHarness.StartAsync();
+        var time = AwayTime();
+        var bridge = await harness.StartInstance(time: time).InitializedAsync();
+        harness.FirstMate.SetFleetSnapshotText(HoldsOnly(("billing-choice", "Billing API versioning", "Options: A path prefix, B header")));
+        await bridge.WatchAsync(); // the first decisions read seeds the holds it finds without alerting
+
+        time.Advance(TimeSpan.FromMinutes(2));
+        harness.FirstMate.SetFleetSnapshotText(HoldsOnly(
+            ("billing-choice", "Billing API versioning", "Options: A path prefix, B header"),
+            ("cache-choice", "Cache eviction policy", "Options: A lru, B ttl"),
+            ("dns-choice", "DNS provider", "Options: A keep, B switch")));
+        await bridge.WatchAsync();
+        Assert.Equal(2, harness.Telegram.SentMessages().Count);
+
+        var restarted = await harness.StartInstance(time: time).InitializedAsync();
+        time.Advance(TimeSpan.FromMinutes(2));
+        await restarted.WatchAsync();
+
+        Assert.Equal(2, harness.Telegram.SentMessages().Count); // both holds were on record before their alerts went out
+    }
+
+    [Fact]
     public async Task A_hold_closed_for_two_snapshots_in_a_row_is_forgotten_so_the_same_task_can_alert_again()
     {
         await using var harness = await BridgeHarness.StartAsync();
