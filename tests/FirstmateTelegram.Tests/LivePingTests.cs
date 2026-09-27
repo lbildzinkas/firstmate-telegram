@@ -266,6 +266,21 @@ public sealed class LivePingTests
     }
 
     [Fact]
+    public async Task The_live_ping_deadline_is_exactly_the_promised_timeout_even_on_a_ticking_clock()
+    {
+        await using var harness = await BridgeHarness.StartAsync();
+        harness.Telegram.EnqueueText(BridgeHarness.UserId, "/ping live");
+        // The system clock ticks between the note's save and the state write, so a deadline derived from a second
+        // clock read is a second short: the user is promised "up to 60 s" and then told "within 59 s".
+        var bridge = await harness.StartInstance(time: TimeProvider.System).InitializedAsync();
+
+        await bridge.PollAsync();
+
+        var entry = Assert.Single(bridge.Store.Requests.Values);
+        Assert.Equal(TimeSpan.FromSeconds(harness.Config.LivePingTimeoutSeconds), entry.LiveDeadlineAt - entry.SavedAt);
+    }
+
+    [Fact]
     public async Task A_live_ping_saved_without_a_wake_is_repaired_and_still_answered()
     {
         await using var harness = await BridgeHarness.StartAsync();

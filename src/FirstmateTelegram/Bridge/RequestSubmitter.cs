@@ -48,7 +48,7 @@ public sealed class RequestSubmitter
             return new SubmitResult(null, saved.Failure);
 
         var noteId = saved.NoteId!;
-        await RecordAsync(message, bot, requestId, noteId, RequestKinds.Request, saved.Status == NoteSaveStatus.Saved, deadline: null, cancellationToken);
+        await RecordAsync(message, bot, requestId, noteId, RequestKinds.Request, saved.Status == NoteSaveStatus.Saved, _time.GetUtcNow(), deadline: null, cancellationToken);
         _logger.LogInformation(
             "saved message {MessageId} as note {NoteId} ({Outcome}{Wake})",
             message.Id,
@@ -79,7 +79,10 @@ public sealed class RequestSubmitter
             return new SubmitResult(null, saved.Failure);
 
         var noteId = saved.NoteId!;
-        await RecordAsync(message, bot, requestId, noteId, RequestKinds.LivePing, saved.Status == NoteSaveStatus.Saved, _time.GetUtcNow() + timeout, cancellationToken);
+        // One timestamp for the save time and the deadline, so the timeout the forwarder later tells the user
+        // is exactly the timeout that was asked for, never a second less to clock jitter between two reads.
+        var savedAt = _time.GetUtcNow();
+        await RecordAsync(message, bot, requestId, noteId, RequestKinds.LivePing, saved.Status == NoteSaveStatus.Saved, savedAt, savedAt + timeout, cancellationToken);
         _logger.LogInformation(
             "saved the live ping for message {MessageId} as note {NoteId} ({Outcome}{Wake})",
             message.Id,
@@ -93,7 +96,7 @@ public sealed class RequestSubmitter
         return new SubmitResult(noteId, null);
     }
 
-    async Task RecordAsync(Message message, BotIdentity bot, string requestId, string noteId, string kind, bool announced, DateTimeOffset? deadline, CancellationToken cancellationToken)
+    async Task RecordAsync(Message message, BotIdentity bot, string requestId, string noteId, string kind, bool announced, DateTimeOffset savedAt, DateTimeOffset? deadline, CancellationToken cancellationToken)
     {
         var chatId = message.Chat.Id;
         await _store.UpdateRequestsAsync(
@@ -106,7 +109,7 @@ public sealed class RequestSubmitter
                     ChatId = chatId,
                     MessageId = message.Id,
                     Kind = kind,
-                    SavedAt = _time.GetUtcNow(),
+                    SavedAt = savedAt,
                     Announced = announced,
                     LiveDeadlineAt = deadline,
                 }),
