@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using FirstmateTelegram.Tests.Support;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -14,7 +15,7 @@ namespace FirstmateTelegram.Tests.Fakes;
 /// </summary>
 public sealed class FakeTelegramServer : IAsyncDisposable
 {
-    public const string Token = "123456789:AAHfakeTokenForTestsOnly-0123456789ab";
+    public static string Token => FakeTokens.Telegram();
     public const long BotId = 123456789;
     public const string BotUsername = "firstmate_test_bot";
 
