@@ -801,12 +801,13 @@ cd firstmate-telegram
 ### 11.3 The login agent
 
 `service install` writes `~/Library/LaunchAgents/io.github.lbildzinkas.firstmate-telegram.plist` and loads it with `launchctl bootstrap gui/<uid>`.
+A `bootout` can return before launchd has finished removing the job, and a bootstrap racing that teardown fails with error 5 (Input/output error), which an upgrade hits because it reloads the agent. Every load therefore waits, bounded, for `launchctl print gui/<uid>/<label>` to report the job gone, retries `bootstrap` a bounded number of times on error 5, and verifies with `print` that the job is loaded. When loading still fails, the command stops loudly and says to run `firstmate-telegram start` and then `firstmate-telegram doctor` (doctor reports the agent as `installed but not loaded` until then).
 
 | Command | launchctl steps |
 | --- | --- |
-| Re-install | `bootout`, then `bootstrap` |
-| `stop` | `bootout` |
-| `start` | `bootstrap`, then `kickstart` |
+| Re-install | `bootout`, wait (bounded) for the job to be gone, `bootstrap` retried on error 5, verify it is loaded |
+| `stop` | `bootout`, wait (bounded) for the job to be gone |
+| `start` | `bootstrap` retried on error 5, verify it is loaded, then `kickstart` |
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>

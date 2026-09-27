@@ -95,11 +95,16 @@ public sealed class ServiceTests
 
         await installer.InstallAsync("/Users/me/firstmate", CancellationToken.None);
 
+        var target = "gui/501/io.github.lbildzinkas.firstmate-telegram";
         Assert.Equal(
             [
-                "/bin/launchctl print gui/501/io.github.lbildzinkas.firstmate-telegram",
-                "/bin/launchctl bootout gui/501/io.github.lbildzinkas.firstmate-telegram",
+                $"/bin/launchctl print {target}",
+                $"/bin/launchctl bootout {target}",
+                // After bootout, wait for print to report the job gone before bootstrapping.
+                $"/bin/launchctl print {target}",
                 $"/bin/launchctl bootstrap gui/501 {paths.LaunchAgentPlist}",
+                // After bootstrap, verify the job is loaded.
+                $"/bin/launchctl print {target}",
             ],
             launchd.Runner.CommandLines().Where(line => line.StartsWith("/bin/launchctl", StringComparison.Ordinal)));
         var plist = await File.ReadAllTextAsync(paths.LaunchAgentPlist);
@@ -129,6 +134,91 @@ public sealed class ServiceTests
     }
 
     [Fact]
+    public async Task Install_retries_bootstrap_while_launchd_is_still_removing_the_old_job()
+    {
+        using var directory = new TempDirectory();
+        var paths = BridgePaths.FromEnvironment(name => name == "HOME" ? directory.Path : null);
+        Directory.CreateDirectory(paths.AppDirectory);
+        await File.WriteAllTextAsync(paths.InstalledProgram, "");
+        // The first bootstrap after the upgrade hits the teardown race; the second succeeds.
+        var launchd = new FakeLaunchd { IsLoaded = true, BootstrapError5s = 1 };
+        var installer = FastInstaller(paths, launchd);
+
+        await installer.InstallAsync("/Users/me/firstmate", CancellationToken.None);
+
+        var commands = launchd.Runner.CommandLines()
+            .Where(line => line.StartsWith("/bin/launchctl", StringComparison.Ordinal))
+            .Select(line => line["/bin/launchctl ".Length..])
+            .ToList();
+        Assert.Equal(
+            [$"bootstrap gui/501 {paths.LaunchAgentPlist}", $"bootstrap gui/501 {paths.LaunchAgentPlist}"],
+            commands.Where(line => line.StartsWith("bootstrap ", StringComparison.Ordinal)));
+        Assert.True(await installer.IsLoadedAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Install_waits_for_launchd_to_finish_removing_the_old_job_before_bootstrapping()
+    {
+        using var directory = new TempDirectory();
+        var paths = BridgePaths.FromEnvironment(name => name == "HOME" ? directory.Path : null);
+        Directory.CreateDirectory(paths.AppDirectory);
+        await File.WriteAllTextAsync(paths.InstalledProgram, "");
+        // bootout returns while print still reports the job for two more polls.
+        var launchd = new FakeLaunchd { IsLoaded = true, PrintsStillLoadedAfterBootout = 2 };
+        var installer = FastInstaller(paths, launchd);
+
+        await installer.InstallAsync("/Users/me/firstmate", CancellationToken.None);
+
+        var target = "gui/501/io.github.lbildzinkas.firstmate-telegram";
+        Assert.Equal(
+            [
+                $"print {target}",
+                $"bootout {target}",
+                $"print {target}",
+                $"print {target}",
+                $"print {target}",
+                $"bootstrap gui/501 {paths.LaunchAgentPlist}",
+                $"print {target}",
+            ],
+            launchd.Runner.CommandLines()
+                .Where(line => line.StartsWith("/bin/launchctl", StringComparison.Ordinal))
+                .Select(line => line["/bin/launchctl ".Length..]));
+    }
+
+    [Fact]
+    public async Task A_bootstrap_error_5_that_never_clears_is_reported_with_the_fix()
+    {
+        using var directory = new TempDirectory();
+        var paths = BridgePaths.FromEnvironment(name => name == "HOME" ? directory.Path : null);
+        Directory.CreateDirectory(Path.GetDirectoryName(paths.LaunchAgentPlist)!);
+        await File.WriteAllTextAsync(paths.LaunchAgentPlist, "");
+        var launchd = new FakeLaunchd { FailBootstrap = true };
+        var installer = FastInstaller(paths, launchd);
+
+        var error = await Assert.ThrowsAsync<BridgeException>(() => installer.StartAsync(CancellationToken.None));
+
+        Assert.Contains("launchctl bootstrap could not load the login agent (3 attempts): Bootstrap failed: 5: Input/output error", error.Message);
+        Assert.Contains("run `firstmate-telegram start` to load it, then `firstmate-telegram doctor` to check it", error.Message);
+        Assert.Equal(3, launchd.Runner.CommandLines().Count(line => line.Contains("/bin/launchctl bootstrap ", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public async Task A_bootstrap_that_never_loads_the_job_is_reported_with_the_fix()
+    {
+        using var directory = new TempDirectory();
+        var paths = BridgePaths.FromEnvironment(name => name == "HOME" ? directory.Path : null);
+        Directory.CreateDirectory(Path.GetDirectoryName(paths.LaunchAgentPlist)!);
+        await File.WriteAllTextAsync(paths.LaunchAgentPlist, "");
+        var launchd = new FakeLaunchd { BootstrapDoesNotLoad = true };
+        var installer = FastInstaller(paths, launchd);
+
+        var error = await Assert.ThrowsAsync<BridgeException>(() => installer.StartAsync(CancellationToken.None));
+
+        Assert.Contains("bootstrap reported success but the login agent is not loaded in launchd", error.Message);
+        Assert.Contains("run `firstmate-telegram start` to load it, then `firstmate-telegram doctor` to check it", error.Message);
+    }
+
+    [Fact]
     public async Task Start_bootstraps_then_kickstarts_and_stop_boots_out()
     {
         using var directory = new TempDirectory();
@@ -136,37 +226,35 @@ public sealed class ServiceTests
         Directory.CreateDirectory(Path.GetDirectoryName(paths.LaunchAgentPlist)!);
         await File.WriteAllTextAsync(paths.LaunchAgentPlist, "");
         var launchd = new FakeLaunchd();
-        var installer = new LaunchdServiceInstaller(paths, launchd.Runner, new ToolLocator(_ => null));
+        var installer = FastInstaller(paths, launchd);
 
         await installer.StartAsync(CancellationToken.None);
         await installer.StopAsync(CancellationToken.None);
         await installer.StopAsync(CancellationToken.None);
 
+        var target = "gui/501/io.github.lbildzinkas.firstmate-telegram";
         Assert.Equal(
             [
-                "print gui/501/io.github.lbildzinkas.firstmate-telegram",
+                $"print {target}",
                 $"bootstrap gui/501 {paths.LaunchAgentPlist}",
-                "kickstart gui/501/io.github.lbildzinkas.firstmate-telegram",
-                "print gui/501/io.github.lbildzinkas.firstmate-telegram",
-                "bootout gui/501/io.github.lbildzinkas.firstmate-telegram",
-                "print gui/501/io.github.lbildzinkas.firstmate-telegram",
+                $"print {target}",
+                $"kickstart {target}",
+                $"print {target}",
+                $"bootout {target}",
+                $"print {target}",
+                $"print {target}",
             ],
-            launchd.Runner.CommandLines().Where(line => line.StartsWith("/bin/launchctl", StringComparison.Ordinal)).Select(line => line["/bin/launchctl ".Length..]));
+            launchd.Runner.CommandLines()
+                .Where(line => line.StartsWith("/bin/launchctl", StringComparison.Ordinal))
+                .Select(line => line["/bin/launchctl ".Length..]));
     }
 
-    [Fact]
-    public async Task A_failing_launchctl_call_is_reported()
-    {
-        using var directory = new TempDirectory();
-        var paths = BridgePaths.FromEnvironment(name => name == "HOME" ? directory.Path : null);
-        Directory.CreateDirectory(Path.GetDirectoryName(paths.LaunchAgentPlist)!);
-        await File.WriteAllTextAsync(paths.LaunchAgentPlist, "");
-        var launchd = new FakeLaunchd { FailBootstrap = true };
-
-        var error = await Assert.ThrowsAsync<BridgeException>(() => new LaunchdServiceInstaller(paths, launchd.Runner, new ToolLocator(_ => null)).StartAsync(CancellationToken.None));
-
-        Assert.Contains("launchctl bootstrap could not load the login agent: Bootstrap failed: 5: Input/output error", error.Message);
-    }
+    static LaunchdServiceInstaller FastInstaller(BridgePaths paths, FakeLaunchd launchd) =>
+        new(paths, launchd.Runner, new ToolLocator(_ => null))
+        {
+            ReloadWait = TimeSpan.FromMilliseconds(200),
+            ReloadPollInterval = TimeSpan.FromMilliseconds(1),
+        };
 
     static string Executable(TempDirectory directory, string folder, string name)
     {
@@ -186,7 +274,19 @@ public sealed class ServiceTests
 
         public bool IsLoaded { get; set; }
 
+        /// <summary>Every bootstrap fails with the error-5 teardown race.</summary>
         public bool FailBootstrap { get; init; }
+
+        /// <summary>How many bootstraps fail with error 5 before one succeeds.</summary>
+        public int BootstrapError5s { get; set; }
+
+        /// <summary>How many prints after a bootout still report the job, as launchd finishes removing it.</summary>
+        public int PrintsStillLoadedAfterBootout { get; init; }
+
+        /// <summary>bootstrap exits 0 without loading the job, so the load never verifies.</summary>
+        public bool BootstrapDoesNotLoad { get; init; }
+
+        int printsStillLoaded;
 
         ProcessResult Answer(ProcessRequest request)
         {
@@ -195,15 +295,23 @@ public sealed class ServiceTests
 
             switch (request.Arguments[0])
             {
+                case "print" when printsStillLoaded > 0:
+                    printsStillLoaded--;
+                    return new ProcessResult(0, "", "");
                 case "print":
                     return new ProcessResult(IsLoaded ? 0 : 113, "", IsLoaded ? "" : "Could not find service");
+                case "bootstrap" when BootstrapError5s > 0:
+                    BootstrapError5s--;
+                    return new ProcessResult(5, "", "Bootstrap failed: 5: Input/output error\n");
                 case "bootstrap" when FailBootstrap:
                     return new ProcessResult(5, "", "Bootstrap failed: 5: Input/output error\n");
                 case "bootstrap":
-                    IsLoaded = true;
+                    if (!BootstrapDoesNotLoad)
+                        IsLoaded = true;
                     return new ProcessResult(0, "", "");
                 case "bootout":
                     IsLoaded = false;
+                    printsStillLoaded = PrintsStillLoadedAfterBootout;
                     return new ProcessResult(0, "", "");
                 default:
                     return new ProcessResult(0, "", "");
