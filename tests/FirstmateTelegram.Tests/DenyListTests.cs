@@ -56,6 +56,16 @@ public sealed class DenyListTests
     }
 
     [Fact]
+    public void Two_denied_urls_in_one_message_are_both_masked()
+    {
+        var redactor = new Redactor(["acme/webapp"]);
+
+        Assert.Equal(
+            "See a private project and a private project",
+            redactor.Apply("See https://github.com/acme/webapp/pull/7 and https://github.com/acme/webapp/pull/8"));
+    }
+
+    [Fact]
     public async Task A_status_answer_shows_a_private_project_row_without_title_state_or_link()
     {
         await using var harness = await BridgeHarness.StartAsync();

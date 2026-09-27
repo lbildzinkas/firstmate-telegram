@@ -59,9 +59,6 @@ public static class BridgeTexts
     public static string RecordsUnreadable(string reason) =>
         string.Create(CultureInfo.InvariantCulture, $"Could not read FirstMate's records: {reason}");
 
-    public static string NotAvailableYet(string command) =>
-        string.Create(CultureInfo.InvariantCulture, $"/{command} isn't available yet in this version of firstmate-telegram.");
-
     public static string StillTrying(string reason) =>
         string.Create(CultureInfo.InvariantCulture, $"Couldn't save your request in FirstMate's inbox yet ({reason}); still trying.");
 

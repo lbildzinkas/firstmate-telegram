@@ -146,6 +146,58 @@ public sealed class AvailabilityAlertTests
     }
 
     [Fact]
+    public async Task An_outage_that_alerted_before_a_wake_does_not_alert_again_after_the_grace()
+    {
+        await using var harness = await BridgeHarness.StartAsync();
+        var time = AwayClock();
+        harness.FirstMate.SetReady("ready-not-running-away.json");
+        var bridge = await harness.StartInstance(time: time).InitializedAsync();
+
+        await PollAsync(bridge, time, minutes: 5);
+        Assert.Single(harness.Telegram.SentMessages());
+
+        time.Advance(TimeSpan.FromMinutes(30)); // the wall clock jumps: the Mac slept and woke
+        await bridge.CheckAvailabilityAsync();
+
+        for (var poll = 0; poll < 5; poll++) // past the five-minute grace, the outage still present
+        {
+            time.Advance(TimeSpan.FromMinutes(1));
+            await bridge.CheckAvailabilityAsync();
+        }
+
+        Assert.Single(harness.Telegram.SentMessages()); // the same outage never alerts twice, even across a wake
+    }
+
+    [Fact]
+    public async Task An_outage_that_recovered_without_alerting_never_shortens_a_later_outages_debounce()
+    {
+        await using var harness = await BridgeHarness.StartAsync();
+        var time = AwayClock();
+        harness.FirstMate.SetReady("ready-not-running.json");
+        var bridge = await harness.StartInstance(time: time).InitializedAsync();
+
+        await PollAsync(bridge, time, minutes: 3); // an outage while the user is present: nothing to alert
+        Assert.Empty(harness.Telegram.SentMessages());
+
+        harness.FirstMate.SetReady("ready-running-listening.json");
+        await PollAsync(bridge, time, minutes: 3); // the recovery is confirmed: the watch is dropped
+        Assert.Null(bridge.Store.State.Availability);
+
+        harness.FirstMate.SetReady("ready-not-running-away.json");
+        time.Advance(TimeSpan.FromMinutes(1));
+        await bridge.CheckAvailabilityAsync();
+        Assert.Empty(harness.Telegram.SentMessages()); // first bad poll of the new outage
+
+        time.Advance(TimeSpan.FromMinutes(1));
+        await bridge.CheckAvailabilityAsync();
+        Assert.Empty(harness.Telegram.SentMessages()); // two polls in a row, but not two minutes of this outage
+
+        time.Advance(TimeSpan.FromMinutes(1));
+        await bridge.CheckAvailabilityAsync();
+        Assert.Single(harness.Telegram.SentMessages()); // the new outage held for two minutes: alert
+    }
+
+    [Fact]
     public async Task When_away_mode_ends_alerts_stop_and_the_recovery_never_announces_itself()
     {
         await using var harness = await BridgeHarness.StartAsync();

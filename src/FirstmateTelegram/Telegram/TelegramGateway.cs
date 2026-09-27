@@ -81,13 +81,13 @@ public sealed class TelegramGateway
     {
         var done = await CallAsync(
             "setMyCommands",
-            token =>
+            async token =>
             {
-                _client.SetMyCommands(
+                await _client.SetMyCommands(
                     commands.Select(command => new BotCommand { Command = command.Command, Description = command.Description }),
                     scope: new BotCommandScopeChat { ChatId = chatId },
                     cancellationToken: token);
-                return Task.FromResult(true);
+                return true;
             },
             _options.CallTimeout,
             bestEffort: true,

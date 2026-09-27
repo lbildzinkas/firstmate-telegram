@@ -71,12 +71,14 @@ public sealed class AvailabilityMonitor : BackgroundService
         {
             _logger.LogInformation("wall clock jumped {Seconds} s between polls; treating it as a wake and holding alerts for {Minutes} min", (now - _lastPollAt).TotalSeconds.ToString("0.#", CultureInfo.InvariantCulture), WakeGrace.TotalMinutes.ToString(CultureInfo.InvariantCulture));
             _suppressUntil = now + WakeGrace;
-            await _store.UpdateStateAsync(state => state with { Availability = null }, cancellationToken);
+            await _store.UpdateStateAsync(
+                state => state with { Availability = state.Availability is { } watch ? watch with { BadStreak = 0, GoodStreak = 0, GoodSince = null } : null },
+                cancellationToken);
         }
 
-        _lastPollAt = now;
         var report = await _availability.ReadAsync(cancellationToken, await ReadQuotaAsync(cancellationToken));
         await EvaluateAsync(report, now, cancellationToken);
+        _lastPollAt = _time.GetUtcNow();
     }
 
     async Task EvaluateAsync(AvailabilityReport report, DateTimeOffset now, CancellationToken cancellationToken)
@@ -109,10 +111,10 @@ public sealed class AvailabilityMonitor : BackgroundService
 
         var goodSince = watch.GoodSince ?? now;
         var streak = watch.GoodStreak + 1;
-        if (watch.Alerted && streak >= 2 && now - goodSince >= DebounceWindow)
+        if (streak >= 2 && now - goodSince >= DebounceWindow)
         {
             // "Available again" is sent only for an outage the bridge alerted, and only while away mode is on.
-            if (away && now >= _suppressUntil)
+            if (watch.Alerted && away && now >= _suppressUntil)
             {
                 await _alerts.SendAsync(
                     $"availability:back:{watch.BadSince.ToString("O", CultureInfo.InvariantCulture)}",

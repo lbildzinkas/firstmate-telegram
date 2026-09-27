@@ -687,7 +687,7 @@ The bridge keeps its own small state in its own folders, never inside FirstMate'
 | `~/.config/firstmate-telegram/` | 700 | Configuration folder |
 | `~/.config/firstmate-telegram/token` | 600 | The bot token, one line |
 | `~/.config/firstmate-telegram/config.json` | 600 | Configuration (10.1) |
-| `~/.local/state/firstmate-telegram/state.json` | 600 | Telegram position (bot id, last confirmed update id), commands answered ahead of a blocked request, reply cursor, mute end time, stopped flag, ledger position (file identity and byte offset), availability state |
+| `~/.local/state/firstmate-telegram/state.json` | 600 | Telegram position (bot id, last confirmed update id), commands answered ahead of a blocked request, reply cursor, mute end time, stopped flag, ledger position (file identity and byte offset), decision holds, settle watches, availability state |
 | `~/.local/state/firstmate-telegram/requests.json` | 600 | Request map: note id to Telegram chat and message id, kind (request, live ping, return, alert reply), times, and reply progress. An entry is dropped 30 days after its reply. |
 | `~/.local/state/firstmate-telegram/alerts.json` | 600 | Alert history: dedupe key, time, Telegram message id, task id, and the alert text (kept so a reply to the alert can quote it). Entries are kept for 90 days. |
 | `~/.local/state/firstmate-telegram/lock` | 600 | Single-instance lock |
@@ -696,8 +696,9 @@ The bridge keeps its own small state in its own folders, never inside FirstMate'
 | `~/.local/bin/firstmate-telegram` | link | Link to the program |
 | `~/Library/LaunchAgents/io.github.lbildzinkas.firstmate-telegram.plist` | 644 | The login agent |
 
-The alert history is the only place the bridge stores message text on disk.
-It is needed to tie a reply to its alert, and it lives with mode 600 on the same Mac as FirstMate's own records.
+The alert history is the only place the bridge stores alert and chat message text on disk.
+While a settle window runs, `state.json` keeps the worker's raw status line for the alert it may become, and drops it with the watch when the window closes.
+The history is needed to tie a reply to its alert, and it lives with mode 600 on the same Mac as FirstMate's own records.
 
 ## 10. Configuration and setup
 

@@ -10,7 +10,7 @@ namespace FirstmateTelegram.Bridge;
 /// message is sent, and the Telegram message id is recorded after it, so a crash between the two can lose
 /// reply-matching for that one alert but never sends it twice. While a mute is on the alert goes out silently;
 /// it is never dropped. Entries are kept for 90 days, and the history is the only place the bridge stores
-/// message text on disk.
+/// alert and chat message text on disk.
 /// </summary>
 public sealed class AlertSender
 {

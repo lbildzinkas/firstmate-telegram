@@ -133,7 +133,7 @@ public sealed record AlertEntry
     /// <summary>The FirstMate task the alert is about, when there is one.</summary>
     public string? Task { get; init; }
 
-    /// <summary>The alert text exactly as sent. The only message text the bridge stores on disk (spec 9).</summary>
+    /// <summary>The alert text exactly as sent. The only alert or chat message text the bridge stores on disk (spec 9).</summary>
     public required string Text { get; init; }
 
     /// <summary>The sent alert's Telegram message id, recorded after the send; used to match a reply to the alert.</summary>

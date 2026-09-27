@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using FirstmateTelegram.FirstMate;
 using FirstmateTelegram.State;
@@ -121,11 +122,9 @@ public sealed class CommandRouter
             case "help":
                 await SendAsync(message, BridgeTexts.Help, cancellationToken);
                 return CommandAnswer.Handled;
-
-            default:
-                await SendAsync(message, BridgeTexts.NotAvailableYet(command.Name), cancellationToken);
-                return CommandAnswer.Handled;
         }
+
+        throw new UnreachableException();
     }
 
     async Task<CommandAnswer> AnswerPingAsync(Message message, ChatCommand command, BotIdentity bot, CancellationToken cancellationToken)

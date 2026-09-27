@@ -237,8 +237,10 @@ public sealed class AlertWatcher : BackgroundService
             }
 
             var firstSeen = now;
+            updated[id] = new DecisionWatch(firstSeen, 0);
             if (!firstRead)
             {
+                await _store.UpdateStateAsync(state => state with { Decisions = updated }, cancellationToken);
                 var text = _redactor.IsDenied(record.Repo)
                     ? BridgeTexts.DecisionPrivateAlert
                     : string.IsNullOrWhiteSpace(record.HoldReason)
@@ -246,8 +248,6 @@ public sealed class AlertWatcher : BackgroundService
                         : BridgeTexts.DecisionAlert(record.Title, record.HoldReason);
                 await _sender.SendAsync($"decision:{id}:{firstSeen.ToString("O", System.Globalization.CultureInfo.InvariantCulture)}", id, text, _chatId, cancellationToken);
             }
-
-            updated[id] = new DecisionWatch(firstSeen, 0);
         }
 
         foreach (var (id, watch) in updated.ToList())

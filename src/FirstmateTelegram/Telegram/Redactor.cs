@@ -41,7 +41,7 @@ public sealed partial class Redactor
             return text;
 
         var result = new StringBuilder(text);
-        foreach (var url in GitHubUrl().Matches(text).ToList())
+        foreach (var url in GitHubUrl().Matches(text).OrderByDescending(match => match.Index))
         {
             var repository = url.Groups["repo"].Value;
             if (IsDenied(repository) || IsDenied(url.Groups["owner"].Value + "/" + repository))

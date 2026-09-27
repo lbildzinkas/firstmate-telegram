@@ -28,7 +28,7 @@ firstmate-telegram is a .NET 10 bridge between a private Telegram chat and a run
 - Tests never call the real Telegram API or a real FirstMate home, and never install the login agent; `install.sh` runs in tests only with `--dry-run` and a throwaway `HOME`.
 - Log lines carry times and ids only, never message text, and every line passes `TokenMask`.
 - Telegram's position advances only over handled updates, and FirstMate's reply cursor only after a reply's last part is sent. `CrashWindowTests` guard both; keep them passing.
-- An alert's dedupe key is written to `alerts.json` before the message is sent and the Telegram message id after; `alerts.json` is the only file holding message text, kept for replies to alerts.
+- An alert's dedupe key is written to `alerts.json` before the message is sent and the Telegram message id after; `alerts.json` is the only file holding alert or chat message text, kept for replies to alerts. A settle watch keeps its raw worker status line in `state.json` until its window closes.
 - Inside `FirstmateTelegram.*` namespaces, `Telegram.` resolves to `FirstmateTelegram.Telegram`, so import Telegram.Bot with `using Telegram.Bot;` at the top of the file.
 
 ## Maintaining this file
