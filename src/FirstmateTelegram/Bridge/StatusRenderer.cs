@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using FirstmateTelegram.FirstMate;
+using FirstmateTelegram.Telegram;
 using Microsoft.Extensions.Logging;
 
 namespace FirstmateTelegram.Bridge;
@@ -8,7 +9,8 @@ namespace FirstmateTelegram.Bridge;
 /// <summary>
 /// The /status answer: four parts projected from FirstMate's saved records, without interrupting FirstMate or
 /// spending model tokens (spec 4.3.1 and 7.2.5). Away mode makes the bearings projection refuse (exit 3), and the
-/// canonical fleet snapshot is used instead with its own simpler projection.
+/// canonical fleet snapshot is used instead with its own simpler projection. A structured row whose project or
+/// repository is on the deny list shows as "a private project", with no title, state or link (spec 6).
 /// </summary>
 public sealed class StatusRenderer
 {
@@ -18,12 +20,14 @@ public sealed class StatusRenderer
 
     readonly FirstMateClient _firstMate;
     readonly TimeProvider _time;
+    readonly Redactor _redactor;
     readonly ILogger<StatusRenderer> _logger;
 
-    public StatusRenderer(FirstMateClient firstMate, TimeProvider time, ILogger<StatusRenderer> logger)
+    public StatusRenderer(FirstMateClient firstMate, TimeProvider time, ILogger<StatusRenderer> logger, Redactor? redactor = null)
     {
         _firstMate = firstMate;
         _time = time;
+        _redactor = redactor ?? Redactor.None;
         _logger = logger;
     }
 
@@ -68,7 +72,7 @@ public sealed class StatusRenderer
         return labels.Count == 0 ? $"FirstMate status, {time}" : $"FirstMate status, {time} ({string.Join("; ", labels)})";
     }
 
-    static Parts FromBearings(BearingsSnapshot snapshot)
+    Parts FromBearings(BearingsSnapshot snapshot)
     {
         var reviewed = snapshot.RecordedPrs
             .GroupBy(pr => pr.TaskId, StringComparer.Ordinal)
@@ -78,6 +82,12 @@ public sealed class StatusRenderer
         var underWay = new List<string>();
         foreach (var work in snapshot.InFlight)
         {
+            if (_redactor.IsDenied(work.Repo))
+            {
+                underWay.Add(Redactor.Mask);
+                continue;
+            }
+
             if (work.State == "done")
             {
                 if (reviewed.TryGetValue(work.Id, out var url))
@@ -107,31 +117,35 @@ public sealed class StatusRenderer
         return new Parts(needsYou, landed, underWay, next);
     }
 
-    static Parts FromFleet(FleetSnapshot snapshot)
+    Parts FromFleet(FleetSnapshot snapshot)
     {
         var titles = snapshot.Records
-            .Where(record => record.Id is not null)
+            .Where(record => record.Id is not null && !_redactor.IsDenied(record.Repo))
             .GroupBy(record => record.Id!, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First().Title, StringComparer.Ordinal);
 
         var needsYou = snapshot.Records
             .Where(record => record.CaptainActionable)
-            .Select(record => string.IsNullOrWhiteSpace(record.HoldReason) ? $"Decide: {record.Title}" : $"Decide: {record.Title}. {record.HoldReason}")
+            .Select(record => _redactor.IsDenied(record.Repo) ? Redactor.Mask
+                : string.IsNullOrWhiteSpace(record.HoldReason) ? $"Decide: {record.Title}" : $"Decide: {record.Title}. {record.HoldReason}")
             .ToList();
         var landed = snapshot.Records
             .Where(record => record.State == "done")
             .OrderByDescending(record => record.CompletedAt)
             .Take(LandedFromFleet)
-            .Select(record => record.Title)
+            .Select(record => _redactor.IsDenied(record.Repo) ? Redactor.Mask : record.Title)
             .ToList();
         var underWay = snapshot.Tasks
             .Where(task => !task.SecondMate)
-            .Select(task => string.IsNullOrWhiteSpace(task.Project) ? $"{task.Title} ({task.State ?? "under way"})" : $"{task.Project}: {task.Title} ({task.State ?? "under way"})")
+            .Select(task => _redactor.IsDenied(task.Project) || _redactor.IsDenied(task.Repo) ? Redactor.Mask
+                : string.IsNullOrWhiteSpace(task.Project) ? $"{task.Title} ({task.State ?? "under way"})" : $"{task.Project}: {task.Title} ({task.State ?? "under way"})")
             .ToList();
         var next = snapshot.Records
             .Where(record => record.State == "queued" && !record.CaptainActionable)
             .Select(record =>
             {
+                if (_redactor.IsDenied(record.Repo))
+                    return Redactor.Mask;
                 var waitsOn = record.UnresolvedBlockerIds
                     .Select(id => titles.TryGetValue(id, out var title) ? title : null)
                     .Where(title => title is not null)

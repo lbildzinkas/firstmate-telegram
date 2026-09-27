@@ -34,6 +34,12 @@ public sealed record AvailabilityReport
     /// <summary>Raw posture state from <c>ready</c>: present, away, quiet or unknown.</summary>
     public required string PostureState { get; init; }
 
+    /// <summary>When the binding quota window resets, when that is known.</summary>
+    public DateTimeOffset? QuotaResetsAt { get; init; }
+
+    /// <summary>How long the oldest unacknowledged inbox note has waited, when there is one.</summary>
+    public TimeSpan? OldestWaitingNoteFor { get; init; }
+
     public Readiness Readiness { get; init; }
 
     public bool IsAwayOrQuiet => PostureState is "away" or "quiet";
@@ -44,6 +50,9 @@ public sealed record AvailabilityReport
     /// <summary>The full /ping answer: the verdict first, then the checks behind it.</summary>
     public string Answer() => string.Join("\n", [VerdictLine, .. CheckLines]);
 }
+
+/// <summary>The posture and readiness from one <c>ready</c> read: what <c>/back</c> decides on.</summary>
+public sealed record PostureReading(string PostureState, Readiness? Readiness, CallFailure? Failure);
 
 /// <summary>
 /// The availability model the ping commands share (spec 7.5): running and listening from <c>ready</c>, stopped
@@ -78,11 +87,12 @@ public sealed class AvailabilityReader
         _logger = logger;
     }
 
-    public async Task<AvailabilityReport> ReadAsync(CancellationToken cancellationToken)
+    /// <summary>Reads every check. A caller on a quota budget, such as the availability monitor, passes a quota reading it already has.</summary>
+    public async Task<AvailabilityReport> ReadAsync(CancellationToken cancellationToken, QuotaReading? quota = null)
     {
         var now = _time.GetUtcNow();
         var ready = await _firstMate.ReadReadyAsync(cancellationToken);
-        var quota = await _quota.ReadAsync(cancellationToken);
+        quota ??= await _quota.ReadAsync(cancellationToken);
         var pending = await _firstMate.ReadAllPendingAsync(cancellationToken);
         if (pending.Failure is { } failure)
             _logger.LogWarning("could not read pending notes for the not-responding check ({Failure}, exit {ExitCode})", failure.Kind, failure.ExitCode);
@@ -118,7 +128,19 @@ public sealed class AvailabilityReader
             BridgeLine = "Bridge: up " + Durations.Format(now - _startedAt),
             PostureState = posture,
             Readiness = readiness,
+            QuotaResetsAt = quota.ResetsAt,
+            OldestWaitingNoteFor = oldestWaiting,
         };
+    }
+
+    /// <summary>Reads the quota alone, for a monitor that spaces its quota-axi calls out.</summary>
+    public Task<QuotaReading> ReadQuotaAsync(CancellationToken cancellationToken) => _quota.ReadAsync(cancellationToken);
+
+    /// <summary>Reads only the posture and readiness, the check <c>/back</c> decides on.</summary>
+    public async Task<PostureReading> ReadPostureAsync(CancellationToken cancellationToken)
+    {
+        var ready = await _firstMate.ReadReadyAsync(cancellationToken);
+        return new PostureReading(ready.Reading?.PostureState ?? "unknown", ready.Failure is null ? ReadinessRules.Classify(ready) : null, ready.Failure);
     }
 
     static string ResetSuffix(QuotaReading quota, string? reset)

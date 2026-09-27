@@ -8,6 +8,12 @@ using Telegram.Bot.Types;
 
 namespace FirstmateTelegram.Bridge;
 
+/// <summary>Stops the running bridge, as <c>/stop</c> asks: the host shuts down and <c>run</c> exits 0, so launchd does not restart it.</summary>
+public interface IBridgeStopper
+{
+    void StopBridge();
+}
+
 /// <summary>
 /// The <c>getUpdates</c> loop. Updates are handled in order, and Telegram's position advances only over an unbroken
 /// run of handled updates, after the request's note is saved and the bridge state is written. A request that cannot
@@ -26,10 +32,12 @@ public sealed class UpdatePoller : BackgroundService
     readonly AccessGate _gate;
     readonly CommandRouter _commands;
     readonly RequestSubmitter _submitter;
+    readonly IBridgeStopper? _stopper;
     readonly TimeProvider _time;
     readonly ILogger<UpdatePoller> _logger;
     BotIdentity? _bot;
     BlockedRequest? _blocked;
+    bool _stopRequested;
 
     public UpdatePoller(
         TelegramGateway telegram,
@@ -38,13 +46,15 @@ public sealed class UpdatePoller : BackgroundService
         CommandRouter commands,
         RequestSubmitter submitter,
         TimeProvider time,
-        ILogger<UpdatePoller> logger)
+        ILogger<UpdatePoller> logger,
+        IBridgeStopper? stopper = null)
     {
         _telegram = telegram;
         _store = store;
         _gate = gate;
         _commands = commands;
         _submitter = submitter;
+        _stopper = stopper;
         _time = time;
         _logger = logger;
     }
@@ -61,9 +71,11 @@ public sealed class UpdatePoller : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await InitializeAsync(stoppingToken);
-        while (!stoppingToken.IsCancellationRequested)
+        while (!stoppingToken.IsCancellationRequested && !_stopRequested)
         {
             await PollOnceAsync(stoppingToken);
+            if (_stopRequested)
+                break;
             await WaitWhileBlockedAsync(stoppingToken);
         }
     }
@@ -76,14 +88,27 @@ public sealed class UpdatePoller : BackgroundService
         if (_store.State.BotId != me.Id)
             await _store.UpdateStateAsync(state => state with { BotId = me.Id, UpdateOffset = 0, HandledUpdateIds = [] }, cancellationToken);
         _logger.LogInformation("polling for bot {BotId} from update offset {Offset}", me.Id, _store.State.UpdateOffset);
+
+        // The command list is registered for the user's chat only, so Telegram's command menu shows it there and nowhere else.
+        await _telegram.TrySetMyCommandsAsync(_gate.AllowedUserId, BridgeTexts.TelegramCommands, cancellationToken);
     }
 
     public async Task PollOnceAsync(CancellationToken cancellationToken)
     {
         await _submitter.RepairWakesAsync(cancellationToken);
-        var timeout = _blocked is null ? LongPollSeconds : 0;
+        var timeout = _blocked is null && !_stopRequested ? LongPollSeconds : 0;
         var updates = await _telegram.GetUpdatesAsync(_store.State.UpdateOffset, timeout, cancellationToken);
         await HandleBatchAsync(updates, cancellationToken);
+        if (_stopRequested)
+            await ConfirmStopToTelegramAsync(cancellationToken);
+    }
+
+    /// <summary>Confirms the stopped position to Telegram, so the /stop is not delivered again, and stops the bridge (spec 4.3.7).</summary>
+    async Task ConfirmStopToTelegramAsync(CancellationToken cancellationToken)
+    {
+        await _telegram.GetUpdatesAsync(_store.State.UpdateOffset, 0, cancellationToken);
+        _logger.LogInformation("stop requested from the chat; the stopped flag is set and the bridge exits");
+        _stopper?.StopBridge();
     }
 
     async Task HandleBatchAsync(IEnumerable<Update> updates, CancellationToken cancellationToken)
@@ -150,6 +175,12 @@ public sealed class UpdatePoller : BackgroundService
             {
                 await RecordFailureAsync(update, message, failure, cancellationToken);
                 return Outcome.Waiting;
+            }
+
+            if (answer.StopsBridge)
+            {
+                await _store.UpdateStateAsync(state => state with { Stopped = true }, cancellationToken);
+                _stopRequested = true;
             }
 
             return Outcome.Handled;

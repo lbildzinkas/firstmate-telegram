@@ -16,7 +16,7 @@ public sealed class TelegramGatewayTests
         harness.Telegram.FailNext("sendMessage", 429, "Too Many Requests: retry after 1", retryAfter: 1);
         var started = DateTimeOffset.UtcNow;
 
-        await bridge.Gateway.SendTextAsync(BridgeHarness.UserId, "hello", null, CancellationToken.None);
+        await bridge.Gateway.SendTextAsync(BridgeHarness.UserId, "hello", null, cancellationToken: CancellationToken.None);
 
         var waited = DateTimeOffset.UtcNow - started;
         Assert.InRange(waited, TimeSpan.FromMilliseconds(900), TimeSpan.FromSeconds(30));

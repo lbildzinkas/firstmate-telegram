@@ -1,5 +1,7 @@
+using System.Text.Json.Nodes;
 using FirstmateTelegram.Telegram;
 using FirstmateTelegram.Tests.Support;
+using Microsoft.Extensions.Time.Testing;
 
 namespace FirstmateTelegram.Tests;
 
@@ -154,4 +156,71 @@ public sealed class CrashWindowTests
         Assert.Equal("Here it is.", Assert.Single(harness.Telegram.SentMessages().DistinctBy(message => message.Text)).Text);
         Assert.Equal(cursor, bridge.Store.State.ReplyCursor);
     }
+
+    [Fact]
+    public async Task Crash_after_an_alert_is_sent_but_before_its_message_id_is_recorded_never_sends_it_twice()
+    {
+        await using var harness = await BridgeHarness.StartAsync();
+        var writer = new CrashingStateWriter();
+        var crashed = await harness.StartInstance(writer).InitializedAsync();
+        await crashed.WatchAsync();
+        writer.CrashOn("alerts.json", skip: 1); // the dedupe key was written; the message id was not
+
+        harness.FirstMate.AppendLedger("""{"v":1,"ts":"2026-09-26T14:10:00Z","event":"task.pr_ready","task":"ship-task","pr":"https://github.com/acme/webapp/pull/7"}""");
+        await Assert.ThrowsAsync<SimulatedCrashException>(crashed.WatchAsync);
+        Assert.Single(harness.Telegram.SentMessages());
+
+        var restarted = await harness.StartInstance().InitializedAsync();
+        await restarted.WatchAsync();
+        await restarted.WatchAsync();
+
+        Assert.Single(harness.Telegram.SentMessages()); // exactly one alert per event, even across the crash
+    }
+
+    [Fact]
+    public async Task Crash_around_a_decision_alert_never_sends_it_twice()
+    {
+        await using var harness = await BridgeHarness.StartAsync();
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 9, 26, 14, 5, 0, TimeSpan.Zero));
+        var writer = new CrashingStateWriter();
+        var crashed = await harness.StartInstance(writer, time).InitializedAsync();
+        harness.FirstMate.SetFleetSnapshotText(Holds(("billing-choice", "Billing API versioning", "Options: A path prefix, B header")));
+        await crashed.WatchAsync(); // the first decisions read seeds the holds it finds without alerting
+        writer.CrashOn("state.json"); // the next watch's first state write records the new hold, before its alert goes out
+
+        time.Advance(TimeSpan.FromMinutes(2));
+        harness.FirstMate.SetFleetSnapshotText(Holds(
+            ("billing-choice", "Billing API versioning", "Options: A path prefix, B header"),
+            ("cache-choice", "Cache eviction policy", "Options: A lru, B ttl")));
+        await Assert.ThrowsAsync<SimulatedCrashException>(crashed.WatchAsync);
+        Assert.Empty(harness.Telegram.SentMessages()); // the new hold is on record before its alert goes out
+
+        var restarted = await harness.StartInstance(time: time).InitializedAsync();
+        await restarted.WatchAsync();
+        time.Advance(TimeSpan.FromMinutes(2));
+        await restarted.WatchAsync();
+
+        Assert.Single(harness.Telegram.SentMessages()); // the hold alerts once across the crash
+        Assert.StartsWith("decision:cache-choice:", Assert.Single(restarted.Store.Alerts.Values).Key);
+    }
+
+    static string Holds(params (string Id, string Title, string HoldReason)[] holds) => new JsonObject
+    {
+        ["schema"] = "fm-fleet-snapshot.v1",
+        ["tasks"] = new JsonArray(),
+        ["backlog"] = new JsonObject
+        {
+            ["records"] = new JsonArray(holds.Select(hold => (JsonNode)new JsonObject
+            {
+                ["structured"] = true,
+                ["id"] = hold.Id,
+                ["title"] = hold.Title,
+                ["state"] = "queued",
+                ["captain_actionable"] = true,
+                ["hold_reason"] = hold.HoldReason,
+                ["repo"] = "acme/webapp",
+                ["unresolved_blocker_ids"] = new JsonArray(),
+            }).ToArray()),
+        },
+    }.ToJsonString();
 }

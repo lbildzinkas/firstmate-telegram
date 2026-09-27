@@ -19,6 +19,9 @@ public sealed class AccessGate
         _logger = logger;
     }
 
+    /// <summary>The one Telegram account, and private chat, the bridge answers; its chat is where alerts go.</summary>
+    public long AllowedUserId => _allowedUserId;
+
     public bool Admit(Update update)
     {
         if (update.Message is { From.Id: var fromId, Chat: { Id: var chatId, Type: ChatType.Private } }

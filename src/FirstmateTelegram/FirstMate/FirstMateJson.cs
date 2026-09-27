@@ -132,6 +132,7 @@ public sealed class FleetTaskBacklogJson
 {
     public string? Id { get; init; }
     public string? Title { get; init; }
+    public string? Repo { get; init; }
 }
 
 /// <summary>A worker task, from <c>fm-fleet-snapshot.v1</c>. A task of kind <c>secondmate</c> is not the user's own work.</summary>
@@ -142,6 +143,13 @@ public sealed class FleetTaskJson
     public string? Kind { get; init; }
     public FleetTaskBacklogJson? Backlog { get; init; }
     public FleetTaskStateJson? CurrentState { get; init; }
+    public FleetHintsJson? Hints { get; init; }
+}
+
+/// <summary>A task's open decisions, as <c>hints.open_decisions</c>: kept raw, because the bridge only counts them and looks for a key.</summary>
+public sealed class FleetHintsJson
+{
+    public List<JsonElement>? OpenDecisions { get; init; }
 }
 
 public sealed class FleetCompletionJson
@@ -155,6 +163,7 @@ public sealed class FleetRecordJson
     public string? Id { get; init; }
     public string? Title { get; init; }
     public string? State { get; init; }
+    public string? Repo { get; init; }
     public bool? CaptainActionable { get; init; }
     public string? HoldReason { get; init; }
     public List<string>? UnresolvedBlockerIds { get; init; }

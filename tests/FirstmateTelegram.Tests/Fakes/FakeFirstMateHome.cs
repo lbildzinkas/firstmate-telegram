@@ -23,6 +23,9 @@ public sealed class FakeFirstMateHome : IDisposable
         var script = Path.Combine(Home, "bin", "fm-inbox.sh");
         File.Copy(Path.Combine(AppContext.BaseDirectory, "Fakes", "fm-inbox-stub.py"), script);
         File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        var quota = Path.Combine(Home, "bin", "quota-axi");
+        File.Copy(Path.Combine(AppContext.BaseDirectory, "Fakes", "quota-axi-stub.py"), quota);
+        File.SetUnixFileMode(quota, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         foreach (var name in new[] { "fm-bearings-snapshot.sh", "fm-fleet-snapshot.sh" })
         {
             var snapshot = Path.Combine(Home, "bin", name);
@@ -32,6 +35,8 @@ public sealed class FakeFirstMateHome : IDisposable
         SetReady("ready-running-listening.json");
         SetBearings("bearings.json");
         SetFleetSnapshot("fleet-snapshot.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(LedgerPath)!);
+        File.WriteAllText(LedgerPath, "");
     }
 
     public string Home { get; }
@@ -43,11 +48,49 @@ public sealed class FakeFirstMateHome : IDisposable
     /// <summary>Makes <c>ready</c> print one of the captured fixtures.</summary>
     public void SetReady(string fixture) => File.WriteAllText(Path.Combine(Home, "fake", "ready.json"), Fixtures.Read(fixture));
 
+    /// <summary>Stands in for a FirstMate that gained the explicit-return hook; without it <c>return</c> fails as today's does.</summary>
+    public void AddReturnHook() => File.WriteAllText(Path.Combine(Home, "fake", "return-hook"), "1\n");
+
+    /// <summary>The fake <c>quota-axi</c> in <c>bin/</c>; it prints the fixture <see cref="SetQuota"/> names.</summary>
+    public string QuotaBinary => Path.Combine(Home, "bin", "quota-axi");
+
+    /// <summary>Makes the fake quota-axi print one of the captured quota fixtures.</summary>
+    public void SetQuota(string fixture) => File.WriteAllText(Path.Combine(Home, "fake", "quota.json"), Fixtures.ReadQuota(fixture));
+
+    /// <summary>What FirstMate's user does to turn on the fleet ledger: create the presence flag (spec 7.1).</summary>
+    public void TurnOnFleetLedger()
+    {
+        Directory.CreateDirectory(Path.Combine(Home, "config"));
+        File.WriteAllText(Path.Combine(Home, "config", "fleet-ledger"), "");
+    }
+
+    /// <summary>The fleet activity ledger file, as FirstMate's <c>state/fleet-ledger.jsonl</c>.</summary>
+    public string LedgerPath => Path.Combine(Home, "state", "fleet-ledger.jsonl");
+
+    /// <summary>Appends records to the fleet ledger, as FirstMate's own events would.</summary>
+    public void AppendLedger(params string[] lines)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(LedgerPath)!);
+        File.AppendAllText(LedgerPath, string.Join("\n", lines) + "\n");
+    }
+
+    /// <summary>Replaces the ledger with a new file, the way FirstMate resets it: the inode changes.</summary>
+    public void ReplaceLedger(params string[] lines)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(LedgerPath)!);
+        var fresh = LedgerPath + ".fresh";
+        File.WriteAllText(fresh, string.Join("\n", lines) + "\n");
+        File.Move(fresh, LedgerPath, overwrite: true);
+    }
+
     /// <summary>Makes <c>fm-bearings-snapshot.sh --json</c> print one of the fixtures.</summary>
     public void SetBearings(string fixture) => File.WriteAllText(Path.Combine(Home, "fake", "bearings.json"), Fixtures.Read(fixture));
 
     /// <summary>Makes <c>fm-fleet-snapshot.sh --json</c> print one of the fixtures.</summary>
     public void SetFleetSnapshot(string fixture) => File.WriteAllText(Path.Combine(Home, "fake", "fleet.json"), Fixtures.Read(fixture));
+
+    /// <summary>Makes <c>fm-fleet-snapshot.sh --json</c> print this JSON directly, for snapshot variants tests build themselves.</summary>
+    public void SetFleetSnapshotText(string json) => File.WriteAllText(Path.Combine(Home, "fake", "fleet.json"), json);
 
     /// <summary>Scripts the next calls of <paramref name="subcommand"/>; see the stub's header for the fault shapes.</summary>
     public void Script(string subcommand, params object[] faults) =>

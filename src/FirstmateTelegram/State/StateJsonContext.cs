@@ -8,4 +8,5 @@ namespace FirstmateTelegram.State;
     DefaultIgnoreCondition = JsonIgnoreCondition.Never)]
 [JsonSerializable(typeof(BridgeState))]
 [JsonSerializable(typeof(RequestsDocument))]
+[JsonSerializable(typeof(AlertsDocument))]
 internal sealed partial class StateJsonContext : JsonSerializerContext;

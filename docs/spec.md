@@ -1,6 +1,6 @@
 # firstmate-telegram: v1 specification
 
-Status: specification. v1 is built against this document, one part at a time.
+Status: v1 is built against this document; v1 is now complete, shipped one pull request at a time.
 Every FirstMate fact below was checked against FirstMate `main` at commit [`e9a6675`][fm-commit] (2026-09-26).
 Words with a fixed meaning here (bridge, request, reply, alert, status answer, availability, ping, away mode, private project, explicit return) are defined in [CONTEXT.md](../CONTEXT.md).
 
@@ -687,7 +687,7 @@ The bridge keeps its own small state in its own folders, never inside FirstMate'
 | `~/.config/firstmate-telegram/` | 700 | Configuration folder |
 | `~/.config/firstmate-telegram/token` | 600 | The bot token, one line |
 | `~/.config/firstmate-telegram/config.json` | 600 | Configuration (10.1) |
-| `~/.local/state/firstmate-telegram/state.json` | 600 | Telegram position (bot id, last confirmed update id), commands answered ahead of a blocked request, reply cursor, mute end time, stopped flag, ledger position (file identity and byte offset), availability state |
+| `~/.local/state/firstmate-telegram/state.json` | 600 | Telegram position (bot id, last confirmed update id), commands answered ahead of a blocked request, reply cursor, mute end time, stopped flag, ledger position (file identity and byte offset), decision holds, settle watches, availability state |
 | `~/.local/state/firstmate-telegram/requests.json` | 600 | Request map: note id to Telegram chat and message id, kind (request, live ping, return, alert reply), times, and reply progress. An entry is dropped 30 days after its reply. |
 | `~/.local/state/firstmate-telegram/alerts.json` | 600 | Alert history: dedupe key, time, Telegram message id, task id, and the alert text (kept so a reply to the alert can quote it). Entries are kept for 90 days. |
 | `~/.local/state/firstmate-telegram/lock` | 600 | Single-instance lock |
@@ -696,8 +696,9 @@ The bridge keeps its own small state in its own folders, never inside FirstMate'
 | `~/.local/bin/firstmate-telegram` | link | Link to the program |
 | `~/Library/LaunchAgents/io.github.lbildzinkas.firstmate-telegram.plist` | 644 | The login agent |
 
-The alert history is the only place the bridge stores message text on disk.
-It is needed to tie a reply to its alert, and it lives with mode 600 on the same Mac as FirstMate's own records.
+The alert history is the only place the bridge stores alert and chat message text on disk.
+While a settle window runs, `state.json` keeps the worker's raw status line for the alert it may become, and drops it with the watch when the window closes.
+The history is needed to tie a reply to its alert, and it lives with mode 600 on the same Mac as FirstMate's own records.
 
 ## 10. Configuration and setup
 
@@ -862,14 +863,16 @@ flowchart LR
   CR --> SR[StatusRenderer]
   CR --> AM[AvailabilityMonitor]
   RF[ReplyForwarder] --> GW
-  AW[AlertWatcher] --> GW
-  AM --> GW
+  AW[AlertWatcher] --> AS[AlertSender]
+  AM --> AS
+  AS --> GW
   RS --> FC[FirstMateClient]
   RF --> FC
   AW --> FC
   AM --> FC
   SR --> FC
   FC --> FM[("FirstMate home: fm-inbox.sh, snapshots, ledger")]
+  AW --> FL[FleetLedger] --> FM
   AM --> QR[QuotaReader] --> QA[quota-axi]
   UP --> SS[(StateStore)]
   RF --> SS
@@ -884,12 +887,14 @@ flowchart LR
 | `CommandRouter` | Parses and runs the commands in 4.3. |
 | `RequestSubmitter` | Builds the note body and footer, calls `note`, reacts 👀, and repairs missed wakes. |
 | `ReplyForwarder` (background service) | Polls `receipts`, sends replies and the replied reaction, and completes live pings. |
-| `AlertWatcher` (background service) | Tails the ledger, compares successive decision lists, applies the settle window and dedupe, and sends alerts. |
+| `AlertWatcher` (background service) | Tails the ledger, compares successive decision lists, applies the settle window and dedupe, and sends alerts through `AlertSender`. |
 | `AvailabilityMonitor` (background service) | Polls `ready` and quota, computes the `/ping` verdict, and sends availability alerts in away mode. |
+| `AlertSender` | Sends an alert exactly once per dedupe key: the key is written to the history before the send and the Telegram message id after (8.3). A mute makes its sends silent, never dropped. |
 | `StatusRenderer` | Turns bearings or fleet snapshot JSON into the four-part answer. |
 | `Redactor` | Applies the deny list to all outbound text, in one place inside `TelegramGateway`. |
 | `TelegramGateway` | Every Telegram call: splitting, threading, silent sends while muted, link previews off, reactions, retry and backoff. |
-| `FirstMateClient` | Runs FirstMate's scripts without a shell, with timeouts, `FM_HOME` set and message bodies on standard input. Parses and version-checks their JSON, and reads the ledger file. |
+| `FirstMateClient` | Runs FirstMate's scripts without a shell, with timeouts, `FM_HOME` set and message bodies on standard input. Parses and version-checks their JSON. |
+| `FleetLedger` | Reads the fleet activity ledger file from the stored byte offset and file identity, complete lines only (7.2.6). |
 | `QuotaReader` | Runs `quota-axi` and interprets its output. |
 | `StateStore` | Atomic JSON state and the single-instance lock, with one writer at a time. |
 | `IServiceInstaller`, `LaunchdServiceInstaller` | Plist generation and `launchctl` calls. |
