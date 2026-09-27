@@ -181,13 +181,21 @@ public sealed class FirstMateClient
             return new BearingsResult(null, AwayRefused: false, failure);
 
         var document = parsed.Document!;
+        if (document.DecisionsOpen is null || document.InFlight is null || document.RecordedPrs is null || document.Landed is null || document.Gates is null
+            || document.DecisionsOpen.Any(row => row?.Summary is null)
+            || document.InFlight.Any(row => row?.Id is null || row?.Name is null)
+            || document.RecordedPrs.Any(row => row?.Id is null || row?.Url is null)
+            || document.Landed.Any(row => row?.What is null)
+            || document.Gates.Any(row => row?.Title is null))
+            return new BearingsResult(null, AwayRefused: false, Unparseable(BearingsScript));
+
         return new BearingsResult(
             new BearingsSnapshot(
-                (document.DecisionsOpen ?? []).Where(row => row?.Summary is not null).Select(row => row.Summary!).ToList(),
-                (document.InFlight ?? []).Where(row => row?.Name is not null).Select(row => new BearingsWork(row.Name!, row.State, row.Doing, row.Repo, row.Kind)).ToList(),
-                (document.RecordedPrs ?? []).Where(row => row?.Task is not null).Select(row => new RecordedPr(row.Task!, row.Url)).ToList(),
-                (document.Landed ?? []).Where(row => row?.What is not null).Select(row => new LandedWork(row.What!, row.Artifact)).ToList(),
-                (document.Gates ?? []).Where(row => row?.Title is not null).Select(row => new WorkGate(row.Title!, row.BlockedBy, row.Reason)).ToList()),
+                document.DecisionsOpen.Select(row => row.Summary!).ToList(),
+                document.InFlight.Select(row => new BearingsWork(row.Id!, row.Name!, row.State, row.Doing, row.Repo, row.Kind)).ToList(),
+                document.RecordedPrs.Select(row => new RecordedPr(row.Id!, row.Url)).ToList(),
+                document.Landed.Select(row => new LandedWork(row.What!, NoneMarker(row.Artifact))).ToList(),
+                document.Gates.Select(row => new WorkGate(row.Title!, NoneMarker(row.BlockedBy), NoneMarker(row.Reason))).ToList()),
             AwayRefused: false,
             null);
     }
@@ -206,13 +214,22 @@ public sealed class FirstMateClient
             return new FleetSnapshotResult(null, failure);
 
         var document = parsed.Document!;
+        // Free-form backlog lines are preserved as records without structured members; every other record must carry them.
+        if (document.Tasks is null || document.Backlog?.Records is null
+            || document.Tasks.Any(task => task?.Id is null)
+            || document.Backlog.Records.Any(record => record is null || record is { Structured: not false } && (record.Id is null || record.Title is null || record.State is null)))
+            return new FleetSnapshotResult(null, Unparseable(FleetSnapshotScript));
+
         var snapshot = new FleetSnapshot(
-            (document.Tasks ?? [])
-                .Where(task => task?.Backlog?.Title is not null)
-                .Select(task => new FleetTask(task.Project, task.Backlog!.Title, task.CurrentState?.State, task.SecondMate == true))
+            document.Tasks
+                .Select(task => new FleetTask(
+                    task.Project,
+                    string.IsNullOrWhiteSpace(task.Backlog?.Title) ? task.Id! : task.Backlog!.Title!,
+                    task.CurrentState?.State,
+                    task.Kind == "secondmate"))
                 .ToList(),
-            (document.Backlog?.Records ?? [])
-                .Where(record => record?.Title is not null)
+            document.Backlog.Records
+                .Where(record => record.Structured != false)
                 .Select(record => new FleetRecord(
                     record.Id,
                     record.Title!,
@@ -220,7 +237,7 @@ public sealed class FirstMateClient
                     record.CaptainActionable == true,
                     record.HoldReason,
                     record.UnresolvedBlockerIds ?? [],
-                    record.UpdatedAt))
+                    ParseTime(record.Completion?.Date)))
                 .ToList());
         return new FleetSnapshotResult(snapshot, null);
     }
@@ -237,6 +254,9 @@ public sealed class FirstMateClient
 
     static DateTimeOffset? ParseTime(string? text) =>
         text is not null && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var time) ? time : null;
+
+    /// <summary>The snapshot scripts print <c>-</c> for a member that carries nothing; the bridge renders it as absent.</summary>
+    static string? NoneMarker(string? value) => value is null or "-" ? null : value;
 
     static (NoteJson? Note, CallFailure? Failure) ParseNote(string output, string script)
     {

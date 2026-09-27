@@ -1,1 +1,127 @@
-{"schema":"fm-bearings.v1","home":"me/firstmate","generated":"2026-09-26T19:11:41Z","decisions_open":[{"summary":"billing API versioning. Options: A path prefix, B header"}],"in_flight":[{"name":"fix login redirect","state":"done","doing":"opened the PR","repo":"acme/webapp","kind":"feature"},{"name":"webapp: add CSV export","state":"working","doing":"working, tests passing","repo":"acme/webapp","kind":"feature"}],"recorded_prs":[{"task":"fix login redirect","url":"https://github.com/acme/webapp/pull/7"}],"landed":[{"what":"docs refresh","artifact":"https://github.com/acme/webapp/pull/5"}],"gates":[{"title":"release notes","blocked_by":"add CSV export","reason":null}]}
+{
+  "schema": "fm-bearings.v1",
+  "home": "me/firstmate",
+  "generated": "2026-09-26T19:11:41Z",
+  "prs": "not_requested (run: /bearings include PRs)",
+  "contributions": {
+    "scope": "owned contributions per home",
+    "known": 2,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 2,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "complete": false,
+    "proven_clear": false,
+    "unmeasured_homes": 0,
+    "unreadable_records": 0,
+    "unmeasured": 0,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "captain_omitted": 0,
+    "captain": []
+  },
+  "in_flight": [
+    {
+      "id": "csv-export",
+      "kind": "ship",
+      "state": "working",
+      "repo": "acme/webapp",
+      "name": "Ship the CSV export",
+      "doing": "harness busy (claude-hook)"
+    },
+    {
+      "id": "scout-x",
+      "kind": "scout",
+      "state": "done",
+      "repo": "acme/webapp",
+      "name": "Research search providers",
+      "doing": "report ready"
+    },
+    {
+      "id": "ship-task",
+      "kind": "ship",
+      "state": "done",
+      "repo": "acme/webapp",
+      "name": "Fix the login redirect",
+      "doing": "PR https://github.com/acme/webapp/pull/7 checks green"
+    }
+  ],
+  "secondmates": [],
+  "secondmate_reconcile": [],
+  "decisions_open": [
+    {
+      "id": "billing-choice",
+      "key": "billing-choice",
+      "verb": "captain-hold",
+      "summary": "Billing API versioning: Options: A path prefix, B header",
+      "owner": "(main)"
+    }
+  ],
+  "landed": [
+    {
+      "id": "docs-refresh",
+      "what": "Docs refresh",
+      "artifact": "https://github.com/acme/webapp/pull/5",
+      "owner": "(main)"
+    }
+  ],
+  "gates": [
+    {
+      "id": "release-notes",
+      "title": "Release notes",
+      "blocked_by": "ship-task",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "key-rotation",
+      "title": "Rotate the API key",
+      "blocked_by": "-",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    }
+  ],
+  "reports": [
+    {
+      "id": "scout-x",
+      "path": "/Users/me/firstmate/data/scout-x/report.md"
+    }
+  ],
+  "recorded_prs": [
+    {
+      "id": "ship-task",
+      "url": "https://github.com/acme/webapp/pull/7"
+    }
+  ],
+  "omitted": [
+    {
+      "surface": "backlog item bodies",
+      "reveal": "--fields bodies"
+    },
+    {
+      "surface": "task paths",
+      "reveal": "--fields paths"
+    },
+    {
+      "surface": "watch/steer actions",
+      "reveal": "--fields actions"
+    },
+    {
+      "surface": "healthy endpoint detail",
+      "reveal": "--fields endpoints"
+    },
+    {
+      "surface": "full scout-report inventory",
+      "reveal": "--all-reports"
+    },
+    {
+      "surface": "live PR discovery + checks",
+      "reveal": "--include-prs"
+    }
+  ]
+}

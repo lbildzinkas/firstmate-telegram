@@ -1,1 +1,707 @@
-{"schema":"fm-fleet-snapshot.v1","home":"me/firstmate","generated":"2026-09-26T19:11:41Z","tasks":[{"id":"t1","project":"webapp","second_mate":false,"backlog":{"id":"b3","title":"add CSV export"},"current_state":{"state":"working"}},{"id":"t2","project":"webapp","second_mate":true,"backlog":{"id":"b9","title":"side research for a second mate"},"current_state":{"state":"working"}}],"backlog":{"records":[{"id":"b1","title":"billing API versioning","state":"open","captain_actionable":true,"hold_reason":"Options: A path prefix, B header","unresolved_blocker_ids":[],"updated_at":"2026-09-26T18:00:00Z"},{"id":"b2","title":"docs refresh","state":"done","captain_actionable":false,"hold_reason":null,"unresolved_blocker_ids":[],"updated_at":"2026-09-26T17:00:00Z"},{"id":"b3","title":"add CSV export","state":"in-flight","captain_actionable":false,"hold_reason":null,"unresolved_blocker_ids":[],"updated_at":"2026-09-26T18:30:00Z"},{"id":"b4","title":"release notes","state":"queued","captain_actionable":false,"hold_reason":null,"unresolved_blocker_ids":["b3"],"updated_at":"2026-09-26T16:00:00Z"}]}}
+{
+  "schema": "fm-fleet-snapshot.v1",
+  "generated": "2026-09-26T19:11:41Z",
+  "fm_home": "/Users/me/firstmate",
+  "roots": {
+    "fm_root": "/Users/me/firstmate",
+    "state": "/Users/me/firstmate/state",
+    "data": "/Users/me/firstmate/data",
+    "config": "/Users/me/firstmate/config",
+    "projects": "/Users/me/firstmate/projects"
+  },
+  "backlog": {
+    "path": "/Users/me/firstmate/data/backlog.md",
+    "present": true,
+    "records": [
+      {
+        "order": 1,
+        "state": "in_flight",
+        "structured": true,
+        "id": "ship-task",
+        "checked": false,
+        "title": "Fix the login redirect",
+        "repo": "acme/webapp",
+        "kind": "ship",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": "2026-09-20",
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] ship-task - Fix the login redirect (repo: acme/webapp) (kind: ship) (since 2026-09-20)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "unresolved_blocker_ids": [],
+        "current_role": "worker",
+        "requires_child_metadata": true,
+        "hold_age_days": 6,
+        "hold_bucket": null,
+        "captain_actionable": false
+      },
+      {
+        "order": 2,
+        "state": "in_flight",
+        "structured": true,
+        "id": "csv-export",
+        "checked": false,
+        "title": "Ship the CSV export",
+        "repo": "acme/webapp",
+        "kind": "ship",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": "2026-09-21",
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] csv-export - Ship the CSV export (repo: acme/webapp) (kind: ship) (since 2026-09-21)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "unresolved_blocker_ids": [],
+        "current_role": "worker",
+        "requires_child_metadata": true,
+        "hold_age_days": 5,
+        "hold_bucket": null,
+        "captain_actionable": false
+      },
+      {
+        "order": 3,
+        "state": "in_flight",
+        "structured": true,
+        "id": "scout-x",
+        "checked": false,
+        "title": "Research search providers",
+        "repo": "acme/webapp",
+        "kind": "scout",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": "2026-09-19",
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": "data/scout-x/report.md",
+        "local_note": null,
+        "raw": "- [ ] scout-x - Research search providers data/scout-x/report.md (repo: acme/webapp) (kind: scout) (since 2026-09-19)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "unresolved_blocker_ids": [],
+        "current_role": "worker",
+        "requires_child_metadata": true,
+        "hold_age_days": 7,
+        "hold_bucket": null,
+        "captain_actionable": false
+      },
+      {
+        "order": 4,
+        "state": "queued",
+        "structured": true,
+        "id": "release-notes",
+        "checked": false,
+        "title": "Release notes",
+        "repo": "acme/webapp",
+        "kind": "ship",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": "ship-task",
+        "blocked_by_ids": [
+          "ship-task"
+        ],
+        "blocked_reason": null,
+        "since": null,
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] release-notes - Release notes blocked-by: ship-task (repo: acme/webapp) (kind: ship)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "unresolved_blocker_ids": [
+          "ship-task"
+        ],
+        "current_role": "queued",
+        "requires_child_metadata": false,
+        "hold_age_days": null,
+        "hold_bucket": null,
+        "captain_actionable": false
+      },
+      {
+        "order": 5,
+        "state": "queued",
+        "structured": true,
+        "id": "key-rotation",
+        "checked": false,
+        "title": "Rotate the API key",
+        "repo": "acme/webapp",
+        "kind": "ship",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": null,
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] key-rotation - Rotate the API key (repo: acme/webapp) (kind: ship)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "unresolved_blocker_ids": [],
+        "current_role": "queued",
+        "requires_child_metadata": false,
+        "hold_age_days": null,
+        "hold_bucket": null,
+        "captain_actionable": false
+      },
+      {
+        "order": 6,
+        "state": "queued",
+        "structured": true,
+        "id": "billing-choice",
+        "checked": false,
+        "title": "Billing API versioning",
+        "repo": "acme/webapp",
+        "kind": "captain",
+        "priority": null,
+        "hold_reason": "Options: A path prefix, B header",
+        "hold_kind": "captain",
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": null,
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] billing-choice - Billing API versioning (repo: acme/webapp) (kind: captain) (hold: Options: A path prefix, B header) (hold-kind: captain)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "unresolved_blocker_ids": [],
+        "current_role": "queued",
+        "requires_child_metadata": false,
+        "hold_age_days": null,
+        "hold_bucket": "live",
+        "captain_actionable": true
+      },
+      {
+        "order": 7,
+        "state": "done",
+        "structured": true,
+        "id": "docs-refresh",
+        "checked": true,
+        "title": "Docs refresh",
+        "repo": "acme/webapp",
+        "kind": "ship",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": null,
+        "merged": "2026-09-18",
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": "merged",
+          "date": "2026-09-18"
+        },
+        "links": [
+          "https://github.com/acme/webapp/pull/5"
+        ],
+        "pr_url": "https://github.com/acme/webapp/pull/5",
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [x] docs-refresh - Docs refresh https://github.com/acme/webapp/pull/5 (repo: acme/webapp) (kind: ship) (merged 2026-09-18)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "unresolved_blocker_ids": [],
+        "current_role": "done",
+        "requires_child_metadata": false,
+        "hold_age_days": null,
+        "hold_bucket": null,
+        "captain_actionable": false
+      }
+    ]
+  },
+  "tasks": [
+    {
+      "id": "csv-export",
+      "kind": "ship",
+      "harness": "claude",
+      "mode": "no-mistakes",
+      "yolo": "",
+      "branch": null,
+      "project": "acme/webapp",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/me/firstmate/state/csv-export.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/me/firstmate/state/csv-export.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "working",
+            "note": "tests passing",
+            "raw": "working: tests passing",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": "/Users/me/firstmate/projects/csv-wt",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/me/firstmate/data/csv-export/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "working",
+        "source": "pane",
+        "detail": "harness busy (claude-hook)",
+        "raw": "state: working · source: pane · harness busy (claude-hook)",
+        "observed_at": "2026-09-26T19:11:41Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "firstmate:fm-csv-export",
+        "exists": true,
+        "agent_alive": "not_checked",
+        "status": "unknown",
+        "observed_at": "2026-09-26T19:11:41Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "working: tests passing"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-csv-export",
+        "steer": "bin/fm-send.sh fm-csv-export '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": {
+        "order": 2,
+        "state": "in_flight",
+        "structured": true,
+        "id": "csv-export",
+        "checked": false,
+        "title": "Ship the CSV export",
+        "repo": "acme/webapp",
+        "kind": "ship",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": "2026-09-21",
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] csv-export - Ship the CSV export (repo: acme/webapp) (kind: ship) (since 2026-09-21)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "unresolved_blocker_ids": [],
+        "current_role": "worker",
+        "requires_child_metadata": true,
+        "hold_age_days": 5,
+        "hold_bucket": null,
+        "captain_actionable": false
+      }
+    },
+    {
+      "id": "scout-x",
+      "kind": "scout",
+      "harness": "claude",
+      "mode": "scout",
+      "yolo": "",
+      "branch": null,
+      "project": "acme/webapp",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/me/firstmate/state/scout-x.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/me/firstmate/state/scout-x.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "done",
+            "note": "report ready",
+            "raw": "done: report ready",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": "/Users/me/firstmate/projects/ship-wt",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/me/firstmate/data/scout-x/report.md",
+          "present": true
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "done",
+        "source": "status-log",
+        "detail": "report ready",
+        "raw": "state: done · source: status-log · report ready",
+        "observed_at": "2026-09-26T19:11:41Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "firstmate:fm-scout-x",
+        "exists": true,
+        "agent_alive": "not_checked",
+        "status": "unknown",
+        "observed_at": "2026-09-26T19:11:41Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": true,
+        "last_event_text": "done: report ready"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-scout-x",
+        "steer": "bin/fm-send.sh fm-scout-x '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": {
+        "order": 3,
+        "state": "in_flight",
+        "structured": true,
+        "id": "scout-x",
+        "checked": false,
+        "title": "Research search providers",
+        "repo": "acme/webapp",
+        "kind": "scout",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": "2026-09-19",
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": "data/scout-x/report.md",
+        "local_note": null,
+        "raw": "- [ ] scout-x - Research search providers data/scout-x/report.md (repo: acme/webapp) (kind: scout) (since 2026-09-19)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "unresolved_blocker_ids": [],
+        "current_role": "worker",
+        "requires_child_metadata": true,
+        "hold_age_days": 7,
+        "hold_bucket": null,
+        "captain_actionable": false
+      }
+    },
+    {
+      "id": "ship-task",
+      "kind": "ship",
+      "harness": "claude",
+      "mode": "no-mistakes",
+      "yolo": "",
+      "branch": "fm/ship-task",
+      "project": "acme/webapp",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/me/firstmate/state/ship-task.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/me/firstmate/state/ship-task.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "done",
+            "note": "PR https://github.com/acme/webapp/pull/7 checks green",
+            "raw": "done: PR https://github.com/acme/webapp/pull/7 checks green",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": "/Users/me/firstmate/projects/ship-wt",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/me/firstmate/data/ship-task/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "done",
+        "source": "status-log",
+        "detail": "PR https://github.com/acme/webapp/pull/7 checks green",
+        "raw": "state: done · source: status-log · PR https://github.com/acme/webapp/pull/7 checks green",
+        "observed_at": "2026-09-26T19:11:41Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "firstmate:fm-ship-task",
+        "exists": true,
+        "agent_alive": "not_checked",
+        "status": "unknown",
+        "observed_at": "2026-09-26T19:11:41Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": "https://github.com/acme/webapp/pull/7",
+        "source": "meta",
+        "head": "1a2b3c4d5e6f"
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "done: PR https://github.com/acme/webapp/pull/7 checks green"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-ship-task",
+        "steer": "bin/fm-send.sh fm-ship-task '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": {
+        "order": 1,
+        "state": "in_flight",
+        "structured": true,
+        "id": "ship-task",
+        "checked": false,
+        "title": "Fix the login redirect",
+        "repo": "acme/webapp",
+        "kind": "ship",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": "2026-09-20",
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [],
+        "pr_url": null,
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] ship-task - Fix the login redirect (repo: acme/webapp) (kind: ship) (since 2026-09-20)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "unresolved_blocker_ids": [],
+        "current_role": "worker",
+        "requires_child_metadata": true,
+        "hold_age_days": 6,
+        "hold_bucket": null,
+        "captain_actionable": false
+      }
+    }
+  ],
+  "main_inventory": {
+    "valid": true,
+    "reason": null,
+    "orphan_in_flight": [],
+    "unstructured_current_count": 0
+  },
+  "contributions": {
+    "known": 2,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 2,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "unmeasured": 0,
+    "complete": false,
+    "proven_clear": false,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "unreadable_records": 0,
+    "valid_until": 900,
+    "captain": [],
+    "captain_omitted": 0
+  },
+  "scout_reports": [
+    {
+      "id": "scout-x",
+      "path": "/Users/me/firstmate/data/scout-x/report.md",
+      "kind": "scout"
+    }
+  ],
+  "secondmate_current": {
+    "registry": {
+      "present": false,
+      "available": true,
+      "complete": true,
+      "reason": null,
+      "provenance": "registered-table",
+      "path": "/Users/me/firstmate/data/secondmates.md",
+      "freshness": {
+        "status": "fresh",
+        "observed_at": "2026-09-26T19:11:41Z"
+      },
+      "records": [],
+      "input_truncated": false,
+      "records_truncated": false,
+      "reasons": [],
+      "lines_in_window": 0,
+      "records_in_window": 0
+    },
+    "records": [],
+    "total_registered": 0,
+    "total": 0,
+    "shown": 0,
+    "truncated": 0
+  },
+  "secondmate_landed": {
+    "records": [],
+    "truncated": [],
+    "unreadable": [],
+    "partial": []
+  },
+  "secondmate_guidance": {
+    "note": "For kind=secondmate, bearings selects validated structured state from that registered home; parent events and bounded terminal evidence are fallback-only supplements and never current-state authority."
+  }
+}

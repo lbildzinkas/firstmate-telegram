@@ -85,6 +85,7 @@ public sealed class BearingsDecisionJson
 /// <summary>Work in flight, from <c>fm-bearings.v1</c>. A <c>done</c> row of kind <c>scout</c> is finished research.</summary>
 public sealed class BearingsWorkJson
 {
+    public string? Id { get; init; }
     public string? Name { get; init; }
     public string? State { get; init; }
     public string? Doing { get; init; }
@@ -92,10 +93,10 @@ public sealed class BearingsWorkJson
     public string? Kind { get; init; }
 }
 
-/// <summary>A PR FirstMate recorded for a task, from <c>fm-bearings.v1</c>.</summary>
+/// <summary>A PR FirstMate recorded for a task, from <c>fm-bearings.v1</c>. <c>Id</c> is the task id.</summary>
 public sealed class RecordedPrJson
 {
-    public string? Task { get; init; }
+    public string? Id { get; init; }
     public string? Url { get; init; }
 }
 
@@ -133,24 +134,31 @@ public sealed class FleetTaskBacklogJson
     public string? Title { get; init; }
 }
 
-/// <summary>A worker task, from <c>fm-fleet-snapshot.v1</c>. Second mates are not the user's own work.</summary>
+/// <summary>A worker task, from <c>fm-fleet-snapshot.v1</c>. A task of kind <c>secondmate</c> is not the user's own work.</summary>
 public sealed class FleetTaskJson
 {
+    public string? Id { get; init; }
     public string? Project { get; init; }
-    public bool? SecondMate { get; init; }
+    public string? Kind { get; init; }
     public FleetTaskBacklogJson? Backlog { get; init; }
     public FleetTaskStateJson? CurrentState { get; init; }
 }
 
+public sealed class FleetCompletionJson
+{
+    public string? Date { get; init; }
+}
+
 public sealed class FleetRecordJson
 {
+    public bool? Structured { get; init; }
     public string? Id { get; init; }
     public string? Title { get; init; }
     public string? State { get; init; }
     public bool? CaptainActionable { get; init; }
     public string? HoldReason { get; init; }
     public List<string>? UnresolvedBlockerIds { get; init; }
-    public DateTimeOffset? UpdatedAt { get; init; }
+    public FleetCompletionJson? Completion { get; init; }
 }
 
 public sealed class FleetBacklogJson

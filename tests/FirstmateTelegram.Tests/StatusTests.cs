@@ -28,15 +28,17 @@ public sealed class StatusTests
         var sent = Assert.Single(harness.Telegram.SentMessages());
         Assert.Equal(
             "FirstMate status, 14:05\n"
-            + "Needs you (2)\n"
-            + "• Decide: billing API versioning. Options: A path prefix, B header\n"
-            + "• Review: fix login redirect https://github.com/acme/webapp/pull/7\n"
+            + "Needs you (3)\n"
+            + "• Decide: Billing API versioning: Options: A path prefix, B header\n"
+            + "• Research: Research search providers\n"
+            + "• Review: Fix the login redirect https://github.com/acme/webapp/pull/7\n"
             + "Recently landed (1)\n"
-            + "• docs refresh https://github.com/acme/webapp/pull/5\n"
+            + "• Docs refresh https://github.com/acme/webapp/pull/5\n"
             + "Under way (1)\n"
-            + "• webapp: add CSV export (working, tests passing)\n"
-            + "Next (1)\n"
-            + "• release notes (waits on: add CSV export)",
+            + "• Ship the CSV export (harness busy (claude-hook))\n"
+            + "Next (2)\n"
+            + "• Release notes (waits on: ship-task)\n"
+            + "• Rotate the API key",
             sent.Text);
         Assert.Equal((BridgeHarness.UserId, messageId), (sent.ChatId, sent.ReplyToMessageId));
         Assert.Empty(harness.FirstMate.Calls("note"));
@@ -56,7 +58,7 @@ public sealed class StatusTests
         await bridge.PollAsync();
 
         var sent = Assert.Single(harness.Telegram.SentMessages());
-        Assert.StartsWith("FirstMate status, 14:05\nNeeds you (2)", sent.Text);
+        Assert.StartsWith("FirstMate status, 14:05\nNeeds you (3)", sent.Text);
         Assert.DoesNotContain("away mode", sent.Text);
         Assert.Empty(harness.FirstMate.Calls("note"));
         Assert.Single(harness.FirstMate.SnapshotCalls("bearings"));
@@ -78,13 +80,16 @@ public sealed class StatusTests
         Assert.Equal(
             "FirstMate status, 14:05 (away mode on; away mode: from FirstMate's fleet records)\n"
             + "Needs you (1)\n"
-            + "• Decide: billing API versioning. Options: A path prefix, B header\n"
+            + "• Decide: Billing API versioning. Options: A path prefix, B header\n"
             + "Recently landed (1)\n"
-            + "• docs refresh\n"
-            + "Under way (1)\n"
-            + "• webapp: add CSV export (working)\n"
-            + "Next (1)\n"
-            + "• release notes (waits on: add CSV export)",
+            + "• Docs refresh\n"
+            + "Under way (3)\n"
+            + "• acme/webapp: Ship the CSV export (working)\n"
+            + "• acme/webapp: Research search providers (done)\n"
+            + "• acme/webapp: Fix the login redirect (done)\n"
+            + "Next (2)\n"
+            + "• Release notes (waits on: Fix the login redirect)\n"
+            + "• Rotate the API key",
             sent.Text);
         Assert.Single(harness.FirstMate.SnapshotCalls("bearings"));
         Assert.Equal(["--json"], Assert.Single(harness.FirstMate.SnapshotCalls("fleet")).Arguments);
@@ -105,13 +110,14 @@ public sealed class StatusTests
         var sent = Assert.Single(harness.Telegram.SentMessages()).Text;
         var parts = sent.Split('\n');
         Assert.Equal("Needs you (1)", parts[1]);
-        Assert.Equal("• Research: search provider options", parts[2]);
+        Assert.Equal("• Research: Research search provider options", parts[2]);
         Assert.Equal("Recently landed (10)", parts[3]);
         Assert.Equal("+2 more", parts[3 + 9]);
         Assert.Equal("Under way (1)", parts[13]);
-        Assert.Equal("• webapp: add CSV export (working, tests passing)", parts[14]);
+        Assert.Equal("• Ship the CSV export (harness busy (claude-hook))", parts[14]);
         Assert.Equal("Next (10)", parts[15]);
-        Assert.Equal("• rotate the API key (needs the captain at the terminal)", parts[17]);
+        Assert.Equal("• Rotate the signing key (until 2026-10-01: decide the rotation wi…)", parts[16]);
+        Assert.Equal("• Queued work 1 (waits on: csv-export)", parts[17]);
         Assert.Equal("+2 more", parts[^1]);
     }
 
@@ -160,6 +166,48 @@ public sealed class StatusTests
         Assert.Equal(
             "Could not read FirstMate's records: FirstMate's records use a newer format; update firstmate-telegram",
             Assert.Single(harness.Telegram.SentMessages()).Text);
+    }
+
+    [Fact]
+    public async Task Rows_the_bearings_projection_cannot_read_make_the_answer_say_so_instead_of_nothing()
+    {
+        await using var harness = await BridgeHarness.StartAsync();
+        harness.FirstMate.Script("bearings", new
+        {
+            stdout = "{\"schema\":\"fm-bearings.v1\",\"decisions_open\":[{}],\"in_flight\":[],\"recorded_prs\":[],\"landed\":[],\"gates\":[]}\n",
+            exit = 0,
+        });
+        harness.Telegram.EnqueueText(BridgeHarness.UserId, "/status");
+        var bridge = await harness.StartInstance().InitializedAsync();
+
+        await bridge.PollAsync();
+
+        var text = Assert.Single(harness.Telegram.SentMessages()).Text;
+        Assert.StartsWith("Could not read FirstMate's records:", text);
+        Assert.Contains("unexpected output from fm-bearings-snapshot.sh", text);
+        Assert.DoesNotContain("Needs you", text);
+    }
+
+    [Fact]
+    public async Task Rows_the_fleet_snapshot_cannot_read_make_the_answer_say_so_instead_of_nothing()
+    {
+        await using var harness = await BridgeHarness.StartAsync();
+        harness.FirstMate.SetReady("ready-running-away.json");
+        harness.FirstMate.Script("bearings", new { exit = 3, stderr = "away mode is on" });
+        harness.FirstMate.Script("fleet", new
+        {
+            stdout = "{\"schema\":\"fm-fleet-snapshot.v1\",\"tasks\":[{}],\"backlog\":{\"records\":[]}}\n",
+            exit = 0,
+        });
+        harness.Telegram.EnqueueText(BridgeHarness.UserId, "/status");
+        var bridge = await harness.StartInstance().InitializedAsync();
+
+        await bridge.PollAsync();
+
+        var text = Assert.Single(harness.Telegram.SentMessages()).Text;
+        Assert.StartsWith("Could not read FirstMate's records:", text);
+        Assert.Contains("unexpected output from fm-fleet-snapshot.sh", text);
+        Assert.DoesNotContain("Needs you", text);
     }
 
     [Fact]

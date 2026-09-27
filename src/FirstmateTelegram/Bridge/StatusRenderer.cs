@@ -71,7 +71,7 @@ public sealed class StatusRenderer
     static Parts FromBearings(BearingsSnapshot snapshot)
     {
         var reviewed = snapshot.RecordedPrs
-            .GroupBy(pr => pr.Task, StringComparer.Ordinal)
+            .GroupBy(pr => pr.TaskId, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First().Url, StringComparer.Ordinal);
 
         var needsYou = snapshot.OpenDecisions.Select(summary => $"Decide: {summary}").ToList();
@@ -80,7 +80,7 @@ public sealed class StatusRenderer
         {
             if (work.State == "done")
             {
-                if (reviewed.TryGetValue(work.Name, out var url))
+                if (reviewed.TryGetValue(work.Id, out var url))
                 {
                     needsYou.Add(string.IsNullOrWhiteSpace(url) ? $"Review: {work.Name}" : $"Review: {work.Name} {url}");
                     continue;
@@ -120,7 +120,7 @@ public sealed class StatusRenderer
             .ToList();
         var landed = snapshot.Records
             .Where(record => record.State == "done")
-            .OrderByDescending(record => record.UpdatedAt)
+            .OrderByDescending(record => record.CompletedAt)
             .Take(LandedFromFleet)
             .Select(record => record.Title)
             .ToList();
