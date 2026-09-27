@@ -24,6 +24,7 @@ Derived by hand, because a throwaway home cannot hold a live session lock. Each 
 | --- | --- |
 | `ready-running-listening.json` | lock held, wake consumer healthy, present |
 | `ready-running-away.json` | lock held, wake consumer healthy, away |
+| `ready-running-quiet.json` | lock held, wake consumer healthy, quiet |
 | `ready-not-picking-up.json` | lock held, wake consumer down |
 | `ready-listening-unconfirmed.json` | lock held, wake consumer unknown |
 

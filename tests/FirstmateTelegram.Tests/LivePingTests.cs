@@ -119,6 +119,33 @@ public sealed class LivePingTests
             harness.Telegram.SentMessages()[^1].Text);
     }
 
+    [Fact]
+    public async Task A_live_ping_in_quiet_mode_has_no_away_footer_but_still_explains_the_timeout()
+    {
+        await using var harness = await BridgeHarness.StartAsync();
+        harness.FirstMate.SetReady("ready-running-quiet.json");
+        var time = UtcTime();
+        var messageId = harness.Telegram.EnqueueText(BridgeHarness.UserId, "/ping live");
+        var bridge = await harness.StartInstance(time: time).InitializedAsync();
+
+        await bridge.PollAsync();
+
+        var noteId = Assert.Single(harness.FirstMate.NoteIds());
+        Assert.DoesNotContain("The user is still away", harness.FirstMate.NoteBody(noteId));
+
+        time.Advance(TimeSpan.FromSeconds(60));
+        await bridge.ForwardAsync();
+
+        Assert.Equal(
+            "Not available: FirstMate did not answer within 60 s.\n"
+            + "FirstMate: running, listening\n"
+            + "Away mode: quiet mode\n"
+            + "Claude quota: unknown\n"
+            + "Bridge: up 1 min\n"
+            + "In away mode, FirstMate can take a couple of minutes to pick up a request.",
+            harness.Telegram.SentMessages()[^1].Text);
+    }
+
     [Theory]
     [InlineData("ready-not-running.json", "Not running; requests will queue", "FirstMate: not running")]
     [InlineData("ready-not-running-away.json", "Not running; requests will queue", "FirstMate: not running")]

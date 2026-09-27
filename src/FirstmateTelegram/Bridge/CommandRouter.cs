@@ -117,7 +117,7 @@ public sealed class CommandRouter
             return CommandAnswer.Handled;
         }
 
-        var saved = await _submitter.SubmitLivePingAsync(message, bot, report.IsAwayOrQuiet, _livePingTimeout, cancellationToken);
+        var saved = await _submitter.SubmitLivePingAsync(message, bot, report.PostureState == "away", _livePingTimeout, cancellationToken);
         return saved.IsSaved ? CommandAnswer.Handled : new CommandAnswer(saved.Failure);
     }
 
