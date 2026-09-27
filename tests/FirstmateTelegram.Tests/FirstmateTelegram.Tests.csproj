@@ -26,7 +26,7 @@
 
   <ItemGroup>
     <None Include="Fixtures/**/*" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="Fakes/fm-inbox-stub.py" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fakes/*.py" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

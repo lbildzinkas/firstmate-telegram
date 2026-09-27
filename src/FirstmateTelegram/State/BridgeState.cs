@@ -26,6 +26,9 @@ public sealed record BridgeState
 public static class RequestKinds
 {
     public const string Request = "request";
+
+    /// <summary>A <c>/ping live</c> availability check: a real FirstMate turn that must answer within its deadline.</summary>
+    public const string LivePing = "live ping";
 }
 
 /// <summary>One row of the request map in <c>requests.json</c>: a FirstMate inbox note and the Telegram message it came from.</summary>
@@ -49,8 +52,17 @@ public sealed record RequestEntry
 
     public DateTimeOffset? RepliedAt { get; init; }
 
-    /// <summary>A request waits for its reply until the reply is sent or FirstMate acknowledges it without one.</summary>
-    public bool IsWaitingForReply => RepliedAt is null && AcknowledgedAt is null;
+    /// <summary>When a live ping's answer is overdue; set when the note is saved.</summary>
+    public DateTimeOffset? LiveDeadlineAt { get; init; }
+
+    /// <summary>When the user was told the live ping timed out. A late reply is still delivered afterwards.</summary>
+    public DateTimeOffset? LiveTimeoutToldAt { get; init; }
+
+    /// <summary>A request waits for its reply until the reply is sent or FirstMate acknowledges it without one; a live ping stops waiting at its timeout.</summary>
+    public bool IsWaitingForReply => RepliedAt is null && AcknowledgedAt is null && LiveTimeoutToldAt is null;
+
+    /// <summary>True while a live ping can still be answered in time.</summary>
+    public bool IsLivePingOpen => Kind == RequestKinds.LivePing && RepliedAt is null && LiveTimeoutToldAt is null;
 }
 
 public sealed record RequestsDocument

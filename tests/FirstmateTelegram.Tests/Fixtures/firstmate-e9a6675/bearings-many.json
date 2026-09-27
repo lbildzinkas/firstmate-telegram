@@ -1,0 +1,228 @@
+{
+  "schema": "fm-bearings.v1",
+  "home": "me/firstmate",
+  "generated": "2026-09-26T19:11:41Z",
+  "prs": "not_requested (run: /bearings include PRs)",
+  "contributions": {
+    "scope": "owned contributions per home",
+    "known": 10,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 10,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "complete": false,
+    "proven_clear": false,
+    "unmeasured_homes": 0,
+    "unreadable_records": 0,
+    "unmeasured": 0,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "captain_omitted": 0,
+    "captain": []
+  },
+  "in_flight": [
+    {
+      "id": "csv-export",
+      "kind": "ship",
+      "state": "working",
+      "repo": "acme/webapp",
+      "name": "Ship the CSV export",
+      "doing": "harness busy (claude-hook)"
+    },
+    {
+      "id": "scout-many",
+      "kind": "scout",
+      "state": "done",
+      "repo": "acme/webapp",
+      "name": "Research search provider options",
+      "doing": "report ready"
+    }
+  ],
+  "secondmates": [],
+  "secondmate_reconcile": [],
+  "decisions_open": [],
+  "landed": [
+    {
+      "id": "done-9",
+      "what": "Landed thing 9",
+      "artifact": "https://github.com/acme/webapp/pull/19",
+      "owner": "(main)"
+    },
+    {
+      "id": "docs-refresh",
+      "what": "Docs refresh",
+      "artifact": "https://github.com/acme/webapp/pull/5",
+      "owner": "(main)"
+    },
+    {
+      "id": "done-8",
+      "what": "Landed thing 8",
+      "artifact": "https://github.com/acme/webapp/pull/18",
+      "owner": "(main)"
+    },
+    {
+      "id": "done-7",
+      "what": "Landed thing 7",
+      "artifact": "https://github.com/acme/webapp/pull/17",
+      "owner": "(main)"
+    },
+    {
+      "id": "done-6",
+      "what": "Landed thing 6",
+      "artifact": "https://github.com/acme/webapp/pull/16",
+      "owner": "(main)"
+    },
+    {
+      "id": "done-5",
+      "what": "Landed thing 5",
+      "artifact": "https://github.com/acme/webapp/pull/15",
+      "owner": "(main)"
+    },
+    {
+      "id": "done-4",
+      "what": "Landed thing 4",
+      "artifact": "https://github.com/acme/webapp/pull/14",
+      "owner": "(main)"
+    },
+    {
+      "id": "done-3",
+      "what": "Landed thing 3",
+      "artifact": "https://github.com/acme/webapp/pull/13",
+      "owner": "(main)"
+    },
+    {
+      "id": "done-2",
+      "what": "Landed thing 2",
+      "artifact": "https://github.com/acme/webapp/pull/12",
+      "owner": "(main)"
+    },
+    {
+      "id": "done-1",
+      "what": "Landed thing 1",
+      "artifact": "https://github.com/acme/webapp/pull/11",
+      "owner": "(main)"
+    }
+  ],
+  "gates": [
+    {
+      "id": "signing-key",
+      "title": "Rotate the signing key",
+      "blocked_by": "-",
+      "reason": "until 2026-10-01: decide the rotation wi…",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "queued-1",
+      "title": "Queued work 1",
+      "blocked_by": "csv-export",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "queued-2",
+      "title": "Queued work 2",
+      "blocked_by": "csv-export",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "queued-3",
+      "title": "Queued work 3",
+      "blocked_by": "csv-export",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "queued-4",
+      "title": "Queued work 4",
+      "blocked_by": "csv-export",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "queued-5",
+      "title": "Queued work 5",
+      "blocked_by": "csv-export",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "queued-6",
+      "title": "Queued work 6",
+      "blocked_by": "csv-export",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "queued-7",
+      "title": "Queued work 7",
+      "blocked_by": "csv-export",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "queued-8",
+      "title": "Queued work 8",
+      "blocked_by": "csv-export",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    },
+    {
+      "id": "queued-9",
+      "title": "Queued work 9",
+      "blocked_by": "csv-export",
+      "reason": "-",
+      "owner": "(main)",
+      "filed": null
+    }
+  ],
+  "reports": [
+    {
+      "id": "scout-many",
+      "path": "/Users/me/firstmate/data/scout-many/report.md"
+    }
+  ],
+  "recorded_prs": [],
+  "omitted": [
+    {
+      "surface": "backlog item bodies",
+      "reveal": "--fields bodies"
+    },
+    {
+      "surface": "task paths",
+      "reveal": "--fields paths"
+    },
+    {
+      "surface": "watch/steer actions",
+      "reveal": "--fields actions"
+    },
+    {
+      "surface": "healthy endpoint detail",
+      "reveal": "--fields endpoints"
+    },
+    {
+      "surface": "full scout-report inventory",
+      "reveal": "--all-reports"
+    },
+    {
+      "surface": "captain holds bucketed blocked, dated, or aged: 1",
+      "reveal": "--all-decisions"
+    },
+    {
+      "surface": "live PR discovery + checks",
+      "reveal": "--include-prs"
+    }
+  ]
+}

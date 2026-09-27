@@ -174,6 +174,99 @@ public sealed class FirstMateClientTests
     }
 
     [Fact]
+    public async Task Bearings_parse_the_captured_projection_into_its_parts()
+    {
+        var (client, runner) = Client(new ProcessResult(0, Fixtures.Read("bearings.json"), ""));
+
+        var result = await client.ReadBearingsAsync(CancellationToken.None);
+
+        Assert.Null(result.Failure);
+        var snapshot = result.Snapshot!;
+        Assert.Equal(["Billing API versioning: Options: A path prefix, B header"], snapshot.OpenDecisions);
+        Assert.Equal(("ship-task", "https://github.com/acme/webapp/pull/7"), (Assert.Single(snapshot.RecordedPrs).TaskId, Assert.Single(snapshot.RecordedPrs).Url));
+        Assert.Contains(snapshot.InFlight, work => work is { Id: "ship-task", Name: "Fix the login redirect", State: "done", Kind: "ship" });
+        Assert.Contains(snapshot.InFlight, work => work is { Id: "csv-export", Name: "Ship the CSV export", State: "working" });
+        Assert.Equal(("Docs refresh", "https://github.com/acme/webapp/pull/5"), (Assert.Single(snapshot.Landed).What, Assert.Single(snapshot.Landed).Artifact));
+        var plainGate = Assert.Single(snapshot.Gates, gate => gate.Title == "Rotate the API key");
+        Assert.Null(plainGate.BlockedBy);
+        Assert.Null(plainGate.Reason);
+        Assert.Equal(["--json"], Assert.Single(runner.Requests).Arguments);
+        Assert.Equal(TimeSpan.FromSeconds(60), Assert.Single(runner.Requests).Timeout);
+    }
+
+    [Fact]
+    public async Task The_fleet_snapshot_parses_into_records_and_tasks()
+    {
+        var (client, _) = Client(new ProcessResult(0, Fixtures.Read("fleet-snapshot.json"), ""));
+
+        var result = await client.ReadFleetSnapshotAsync(CancellationToken.None);
+
+        Assert.Null(result.Failure);
+        var snapshot = result.Snapshot!;
+        var decision = Assert.Single(snapshot.Records, record => record.CaptainActionable);
+        Assert.Equal(("billing-choice", "Billing API versioning", "Options: A path prefix, B header"), (decision.Id, decision.Title, decision.HoldReason));
+        var landed = Assert.Single(snapshot.Records, record => record.State == "done");
+        Assert.Equal(("docs-refresh", "Docs refresh", new DateTimeOffset(2026, 9, 18, 0, 0, 0, TimeSpan.Zero)), (landed.Id, landed.Title, landed.CompletedAt));
+        Assert.Equal(["ship-task"], Assert.Single(snapshot.Records, record => record.Id == "release-notes").UnresolvedBlockerIds);
+        Assert.Contains(snapshot.Tasks, task => task is { Title: "Ship the CSV export", State: "working", SecondMate: false });
+        Assert.DoesNotContain(snapshot.Tasks, task => task.SecondMate);
+    }
+
+    [Theory]
+    [InlineData("""{"schema":"fm-bearings.v1","decisions_open":[{"id":"d"}],"in_flight":[],"recorded_prs":[],"landed":[],"gates":[]}""")]
+    [InlineData("""{"schema":"fm-bearings.v1","decisions_open":[],"in_flight":[{"name":"n"}],"recorded_prs":[],"landed":[],"gates":[]}""")]
+    [InlineData("""{"schema":"fm-bearings.v1","decisions_open":[],"in_flight":[{"id":"w"}],"recorded_prs":[],"landed":[],"gates":[]}""")]
+    [InlineData("""{"schema":"fm-bearings.v1","decisions_open":[],"in_flight":[],"recorded_prs":[{"id":"w"}],"landed":[],"gates":[]}""")]
+    [InlineData("""{"schema":"fm-bearings.v1","decisions_open":[],"in_flight":[],"recorded_prs":[],"landed":[{"id":"l"}],"gates":[]}""")]
+    [InlineData("""{"schema":"fm-bearings.v1","decisions_open":[],"in_flight":[],"recorded_prs":[],"landed":[],"gates":[{"id":"g"}]}""")]
+    [InlineData("""{"schema":"fm-bearings.v1","decisions_open":[],"in_flight":[],"recorded_prs":[],"gates":[]}""")]
+    public async Task Bearings_rows_missing_a_required_member_are_unreadable_never_empty(string output)
+    {
+        var (client, _) = Client(new ProcessResult(0, output, ""));
+
+        var result = await client.ReadBearingsAsync(CancellationToken.None);
+
+        Assert.Null(result.Snapshot);
+        Assert.Equal(FailureKind.Unparseable, result.Failure!.Kind);
+    }
+
+    [Theory]
+    [InlineData("""{"schema":"fm-fleet-snapshot.v1","tasks":[{"kind":"ship"}],"backlog":{"records":[]}}""")]
+    [InlineData("""{"schema":"fm-fleet-snapshot.v1","tasks":[],"backlog":{"records":[{"structured":true,"id":"r","state":"queued"}]}}""")]
+    [InlineData("""{"schema":"fm-fleet-snapshot.v1","tasks":[],"backlog":{"records":[{"id":"r","title":"T"}]}}""")]
+    [InlineData("""{"schema":"fm-fleet-snapshot.v1","tasks":[],"backlog":{"records":[null]}}""")]
+    [InlineData("""{"schema":"fm-fleet-snapshot.v1","backlog":{"records":[]}}""")]
+    [InlineData("""{"schema":"fm-fleet-snapshot.v1","tasks":[]}""")]
+    public async Task Fleet_rows_missing_a_required_member_are_unreadable_never_empty(string output)
+    {
+        var (client, _) = Client(new ProcessResult(0, output, ""));
+
+        var result = await client.ReadFleetSnapshotAsync(CancellationToken.None);
+
+        Assert.Null(result.Snapshot);
+        Assert.Equal(FailureKind.Unparseable, result.Failure!.Kind);
+    }
+
+    [Fact]
+    public async Task Free_form_backlog_lines_are_not_records_and_second_mates_are_not_the_users_work()
+    {
+        const string output = """
+            {"schema":"fm-fleet-snapshot.v1","tasks":[{"id":"m","kind":"secondmate","project":"p"},{"id":"t","kind":"ship","project":"p"}],
+             "backlog":{"records":[{"structured":false,"id":null,"raw":"a free-form line"}]}}
+            """;
+        var (client, _) = Client(new ProcessResult(0, output, ""));
+
+        var result = await client.ReadFleetSnapshotAsync(CancellationToken.None);
+
+        Assert.Null(result.Failure);
+        Assert.Empty(result.Snapshot!.Records);
+        var mate = Assert.Single(result.Snapshot.Tasks, task => task.SecondMate);
+        Assert.Equal(("m", "p"), (mate.Title, mate.Project));
+        var own = Assert.Single(result.Snapshot.Tasks, task => !task.SecondMate);
+        Assert.Equal(("t", "p"), (own.Title, own.Project));
+    }
+
+    [Fact]
     public void Todays_FirstMate_has_no_explicit_return_subcommand()
     {
         Assert.Contains("unknown subcommand: return", Fixtures.Read("return-unknown-subcommand.stderr"));

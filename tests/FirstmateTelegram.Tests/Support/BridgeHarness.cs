@@ -79,21 +79,49 @@ public sealed class BridgeInstance : IDisposable
         var client = new TelegramClientFactory(harness.Telegram.BaseUrl).Create(FakeTelegramServer.Token);
         Gateway = new TelegramGateway(client, time, harness.Logging.For<TelegramGateway>(), harness.Retry, random: () => 0.5);
         var firstMate = new FirstMateClient(new SystemProcessRunner(), harness.Config.FirstmateHome, harness.Timeouts);
+        // Tests never run the real quota-axi, even on a machine that has it; the named binary does not exist.
+        var quota = new QuotaReader(new SystemProcessRunner(), harness.Config.QuotaProvider, "quota-axi-not-installed-for-tests");
+        Availability = new AvailabilityReader(
+            firstMate,
+            quota,
+            time,
+            time.GetUtcNow(),
+            TimeSpan.FromMinutes(harness.Config.UnresponsiveAfterMinutes),
+            QuotaReader.ProviderDisplay(harness.Config.QuotaProvider),
+            harness.Logging.For<AvailabilityReader>());
+        Status = new StatusRenderer(firstMate, time, harness.Logging.For<StatusRenderer>());
         Submitter = new RequestSubmitter(firstMate, Gateway, Store, _replyWaiting, time, harness.Logging.For<RequestSubmitter>());
         Poller = new UpdatePoller(
             Gateway,
             Store,
             new AccessGate(harness.Config.AllowedUserId, harness.Logging.For<AccessGate>()),
-            new CommandRouter(Gateway),
+            new CommandRouter(
+                Gateway,
+                Availability,
+                Status,
+                Submitter,
+                TimeSpan.FromSeconds(harness.Config.LivePingTimeoutSeconds)),
             Submitter,
             time,
             harness.Logging.For<UpdatePoller>());
-        Forwarder = new ReplyForwarder(firstMate, Gateway, Store, _replyWaiting, harness.Config.RepliedReaction, time, harness.Logging.For<ReplyForwarder>());
+        Forwarder = new ReplyForwarder(
+            firstMate,
+            Gateway,
+            Store,
+            _replyWaiting,
+            harness.Config.RepliedReaction,
+            Availability,
+            time,
+            harness.Logging.For<ReplyForwarder>());
     }
 
     public StateStore Store { get; }
 
     public TelegramGateway Gateway { get; }
+
+    public AvailabilityReader Availability { get; }
+
+    public StatusRenderer Status { get; }
 
     public RequestSubmitter Submitter { get; }
 

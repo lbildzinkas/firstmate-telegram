@@ -20,8 +20,8 @@ firstmate-telegram is a .NET 10 bridge between a private Telegram chat and a run
 
 ## Layout
 
-- `src/FirstmateTelegram/`: `Bridge/` is the request/reply loop, `Telegram/` the Bot API gateway, `FirstMate/` the `fm-inbox.sh` client, `State/` the bridge's own files, `Service/` the launchd login agent, `Cli/` the commands.
-- `tests/FirstmateTelegram.Tests/`: `Support/BridgeHarness.cs` wires a bridge to `Fakes/` (an in-process Bot API server and a stub `fm-inbox.sh` in a throwaway FirstMate home). `Fixtures/firstmate-e9a6675/README.md` says how the FirstMate outputs were captured.
+- `src/FirstmateTelegram/`: `Bridge/` is the request/reply loop, `Telegram/` the Bot API gateway, `FirstMate/` the clients for FirstMate's scripts (`fm-inbox.sh`, the snapshots) and `quota-axi`, `State/` the bridge's own files, `Service/` the launchd login agent, `Cli/` the commands.
+- `tests/FirstmateTelegram.Tests/`: `Support/BridgeHarness.cs` wires a bridge to `Fakes/` (an in-process Bot API server and stub FirstMate scripts in a throwaway FirstMate home). `Fixtures/firstmate-e9a6675/README.md` says how the FirstMate outputs were captured.
 
 ## Sharp edges
 

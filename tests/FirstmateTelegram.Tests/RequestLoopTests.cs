@@ -258,14 +258,12 @@ public sealed class RequestLoopTests
     }
 
     [Theory]
-    [InlineData("/status", "status")]
-    [InlineData("/PING live", "ping")]
-    [InlineData("/Help@FirstMate_Test_Bot", "help")]
     [InlineData("/mute 2h", "mute")]
     [InlineData("/unmute", "unmute")]
     [InlineData("/back", "back")]
     [InlineData("/stop", "stop")]
-    public async Task The_bridges_own_commands_answer_not_available_yet_and_reach_nobody(string text, string command)
+    [InlineData("/Help@FirstMate_Test_Bot", "help")]
+    public async Task The_commands_a_later_version_adds_answer_not_available_yet_and_reach_nobody(string text, string command)
     {
         await using var harness = await BridgeHarness.StartAsync();
         var messageId = harness.Telegram.EnqueueText(BridgeHarness.UserId, text);
@@ -338,10 +336,10 @@ public sealed class RequestLoopTests
         Assert.Empty(harness.Telegram.Reactions());
         Assert.Equal(startOffset, bridge.Store.State.UpdateOffset);
 
-        var command = harness.Telegram.EnqueueText(BridgeHarness.UserId, "/status");
+        var command = harness.Telegram.EnqueueText(BridgeHarness.UserId, "/help");
         var second = harness.Telegram.EnqueueText(BridgeHarness.UserId, "second request");
         await bridge.PollAsync();
-        Assert.Equal(BridgeTexts.NotAvailableYet("status"), Assert.Single(harness.Telegram.SentMessages()).Text);
+        Assert.Equal(BridgeTexts.NotAvailableYet("help"), Assert.Single(harness.Telegram.SentMessages()).Text);
         Assert.Single(harness.FirstMate.Calls("note"));
 
         time.Advance(TimeSpan.FromSeconds(1));

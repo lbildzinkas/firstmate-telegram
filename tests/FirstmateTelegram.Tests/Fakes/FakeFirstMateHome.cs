@@ -23,7 +23,15 @@ public sealed class FakeFirstMateHome : IDisposable
         var script = Path.Combine(Home, "bin", "fm-inbox.sh");
         File.Copy(Path.Combine(AppContext.BaseDirectory, "Fakes", "fm-inbox-stub.py"), script);
         File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        foreach (var name in new[] { "fm-bearings-snapshot.sh", "fm-fleet-snapshot.sh" })
+        {
+            var snapshot = Path.Combine(Home, "bin", name);
+            File.Copy(Path.Combine(AppContext.BaseDirectory, "Fakes", "fm-snapshot-stub.py"), snapshot);
+            File.SetUnixFileMode(snapshot, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
         SetReady("ready-running-listening.json");
+        SetBearings("bearings.json");
+        SetFleetSnapshot("fleet-snapshot.json");
     }
 
     public string Home { get; }
@@ -34,6 +42,12 @@ public sealed class FakeFirstMateHome : IDisposable
 
     /// <summary>Makes <c>ready</c> print one of the captured fixtures.</summary>
     public void SetReady(string fixture) => File.WriteAllText(Path.Combine(Home, "fake", "ready.json"), Fixtures.Read(fixture));
+
+    /// <summary>Makes <c>fm-bearings-snapshot.sh --json</c> print one of the fixtures.</summary>
+    public void SetBearings(string fixture) => File.WriteAllText(Path.Combine(Home, "fake", "bearings.json"), Fixtures.Read(fixture));
+
+    /// <summary>Makes <c>fm-fleet-snapshot.sh --json</c> print one of the fixtures.</summary>
+    public void SetFleetSnapshot(string fixture) => File.WriteAllText(Path.Combine(Home, "fake", "fleet.json"), Fixtures.Read(fixture));
 
     /// <summary>Scripts the next calls of <paramref name="subcommand"/>; see the stub's header for the fault shapes.</summary>
     public void Script(string subcommand, params object[] faults) =>
@@ -62,12 +76,12 @@ public sealed class FakeFirstMateHome : IDisposable
     public bool IsAnnounced(string noteId) => File.Exists(Path.Combine(Inbox, ".announced", noteId));
 
     /// <summary>What FirstMate's <c>reply</c> records: one reply per note, stamped with the next sequence.</summary>
-    public string Reply(string noteId, string body)
+    public string Reply(string noteId, string body, DateTimeOffset? at = null)
     {
         Directory.CreateDirectory(Replies);
         var sequence = Interlocked.Increment(ref _replySequence);
-        var at = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
-        File.WriteAllText(Path.Combine(Replies, noteId), string.Create(CultureInfo.InvariantCulture, $"id={noteId}\nat={at}\nseq={sequence}\n--\n{body}\n"));
+        var stamp = (at ?? DateTimeOffset.UtcNow).ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
+        File.WriteAllText(Path.Combine(Replies, noteId), string.Create(CultureInfo.InvariantCulture, $"id={noteId}\nat={stamp}\nseq={sequence}\n--\n{body}\n"));
         return sequence.ToString("D12", CultureInfo.InvariantCulture);
     }
 
@@ -78,15 +92,20 @@ public sealed class FakeFirstMateHome : IDisposable
         File.Move(Path.Combine(Inbox, noteId + ".note"), Path.Combine(Inbox, "handled", noteId + ".note"));
     }
 
-    /// <summary>A note from another inbox client, such as voice or a terminal tool.</summary>
-    public string AddOtherNote(string body)
+    /// <summary>A note from another inbox client, such as voice or a terminal tool. Announced notes count towards the not-responding check.</summary>
+    public string AddOtherNote(string body, bool announced = true)
     {
         var noteId = string.Create(CultureInfo.InvariantCulture, $"{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}-other{Guid.NewGuid().ToString("N")[..4]}");
         File.WriteAllText(Path.Combine(Inbox, noteId + ".note"), $"id={noteId}\nat=2026-09-26T00:00:00Z\nsource=text\nannounce_marker=1\n--\n{body}\n");
+        if (announced)
+        {
+            Directory.CreateDirectory(Path.Combine(Inbox, ".announced"));
+            File.WriteAllText(Path.Combine(Inbox, ".announced", noteId), "2026-09-26T00:00:00Z\n");
+        }
         return noteId;
     }
 
-    public sealed record InboxCall(IReadOnlyList<string> Arguments, string? StandardInput, string? FirstmateHome);
+    public sealed record InboxCall(IReadOnlyList<string> Arguments, string? StandardInput, string? FirstmateHome, string? Script = "fm-inbox.sh");
 
     public IReadOnlyList<InboxCall> Calls()
     {
@@ -98,11 +117,15 @@ public sealed class FakeFirstMateHome : IDisposable
             .Select(node => new InboxCall(
                 node["argv"]!.AsArray().Select(argument => argument!.GetValue<string>()).ToList(),
                 node["stdin"]?.GetValue<string>(),
-                node["fm_home"]?.GetValue<string>()))
+                node["fm_home"]?.GetValue<string>(),
+                node["script"]?.GetValue<string>() ?? "fm-inbox.sh"))
             .ToList();
     }
 
-    public IReadOnlyList<InboxCall> Calls(string subcommand) => Calls().Where(call => call.Arguments.Count > 0 && call.Arguments[0] == subcommand).ToList();
+    public IReadOnlyList<InboxCall> Calls(string subcommand) => Calls().Where(call => call.Script == "fm-inbox.sh" && call.Arguments.Count > 0 && call.Arguments[0] == subcommand).ToList();
+
+    /// <summary>Calls of one of the snapshot scripts, by the fixture key the stub records (<c>bearings</c> or <c>fleet</c>).</summary>
+    public IReadOnlyList<InboxCall> SnapshotCalls(string script) => Calls().Where(call => call.Script == script).ToList();
 
     public void Dispose() => _root.Dispose();
 }

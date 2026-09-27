@@ -138,13 +138,25 @@ public sealed class UpdatePoller : BackgroundService
             return Outcome.Handled;
         }
 
-        if (await _commands.TryAnswerAsync(message, text, _bot!.Username, cancellationToken))
+        var command = CommandParser.Parse(text, _bot!.Username);
+        if (command is not null && CommandRouter.IsBridgeCommand(command.Name))
+        {
+            // A live ping becomes an inbox note, so it keeps the requests' order behind one that could not be saved yet.
+            if (CommandRouter.SendsANote(command) && WaitsForNoteSlot(update.Id, isRequestWaiting))
+                return Outcome.Waiting;
+
+            var answer = await _commands.AnswerAsync(message, command, _bot, cancellationToken);
+            if (answer.NoteSaveFailure is { } failure)
+            {
+                await RecordFailureAsync(update, message, failure, cancellationToken);
+                return Outcome.Waiting;
+            }
+
             return Outcome.Handled;
+        }
 
         // Requests reach FirstMate in the order they were sent, so a later one waits behind a blocked one.
-        if (isRequestWaiting)
-            return Outcome.Waiting;
-        if (_blocked is { } blocked && blocked.UpdateId == update.Id && _time.GetUtcNow() < blocked.NextAttemptAt)
+        if (WaitsForNoteSlot(update.Id, isRequestWaiting))
             return Outcome.Waiting;
 
         var result = await _submitter.SubmitAsync(message, text, _bot, cancellationToken);
@@ -157,6 +169,9 @@ public sealed class UpdatePoller : BackgroundService
         await RecordFailureAsync(update, message, result.Failure!, cancellationToken);
         return Outcome.Waiting;
     }
+
+    bool WaitsForNoteSlot(int updateId, bool isRequestWaiting) =>
+        isRequestWaiting || (_blocked is { } blocked && blocked.UpdateId == updateId && _time.GetUtcNow() < blocked.NextAttemptAt);
 
     async Task RecordFailureAsync(Update update, Message message, CallFailure failure, CancellationToken cancellationToken)
     {

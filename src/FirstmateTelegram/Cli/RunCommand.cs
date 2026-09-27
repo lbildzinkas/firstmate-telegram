@@ -100,8 +100,26 @@ public static class RunCommand
         services.AddSingleton(provider => new TelegramGateway(client, environment.Time, provider.GetRequiredService<ILogger<TelegramGateway>>()));
         services.AddSingleton(provider => new FirstMateClient(provider.GetRequiredService<IProcessRunner>(), config.FirstmateHome));
         services.AddSingleton(provider => new AccessGate(config.AllowedUserId, provider.GetRequiredService<ILogger<AccessGate>>()));
-        services.AddSingleton<CommandRouter>();
+        services.AddSingleton(provider => new QuotaReader(provider.GetRequiredService<IProcessRunner>(), config.QuotaProvider));
+        services.AddSingleton(provider => new AvailabilityReader(
+            provider.GetRequiredService<FirstMateClient>(),
+            provider.GetRequiredService<QuotaReader>(),
+            environment.Time,
+            environment.Time.GetUtcNow(),
+            TimeSpan.FromMinutes(config.UnresponsiveAfterMinutes),
+            QuotaReader.ProviderDisplay(config.QuotaProvider),
+            provider.GetRequiredService<ILogger<AvailabilityReader>>()));
+        services.AddSingleton(provider => new StatusRenderer(
+            provider.GetRequiredService<FirstMateClient>(),
+            environment.Time,
+            provider.GetRequiredService<ILogger<StatusRenderer>>()));
         services.AddSingleton<RequestSubmitter>();
+        services.AddSingleton(provider => new CommandRouter(
+            provider.GetRequiredService<TelegramGateway>(),
+            provider.GetRequiredService<AvailabilityReader>(),
+            provider.GetRequiredService<StatusRenderer>(),
+            provider.GetRequiredService<RequestSubmitter>(),
+            TimeSpan.FromSeconds(config.LivePingTimeoutSeconds)));
         services.AddHostedService<UpdatePoller>();
         services.AddHostedService(provider => new ReplyForwarder(
             provider.GetRequiredService<FirstMateClient>(),
@@ -109,6 +127,7 @@ public static class RunCommand
             store,
             provider.GetRequiredService<WakeSignal>(),
             config.RepliedReaction,
+            provider.GetRequiredService<AvailabilityReader>(),
             environment.Time,
             provider.GetRequiredService<ILogger<ReplyForwarder>>()));
         return builder.Build();

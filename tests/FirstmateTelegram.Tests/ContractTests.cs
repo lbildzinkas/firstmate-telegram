@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using FirstmateTelegram.FirstMate;
 using FirstmateTelegram.Infrastructure;
 using FirstmateTelegram.Tests.Support;
@@ -47,6 +48,30 @@ public sealed class ContractTests
         Assert.Equal(Readiness.NotRunning, ReadinessRules.Classify(ready));
     }
 
+    [ContractFact]
+    public async Task Bearings_and_fleet_snapshots_match_the_contract()
+    {
+        using var home = SeededHome();
+        var client = new FirstMateClient(new SystemProcessRunner(), home.Path);
+
+        var bearings = await client.ReadBearingsAsync(CancellationToken.None);
+
+        Assert.Null(bearings.Failure);
+        Assert.Equal(["Billing API versioning: Options: A path prefix, B header"], bearings.Snapshot!.OpenDecisions);
+        Assert.Contains(bearings.Snapshot.InFlight, work => work is { Id: "ship-task", Name: "Fix the login redirect" });
+        Assert.Equal("ship-task", Assert.Single(bearings.Snapshot.Gates).BlockedBy);
+        Assert.Equal("Docs refresh", Assert.Single(bearings.Snapshot.Landed).What);
+
+        var fleet = await client.ReadFleetSnapshotAsync(CancellationToken.None);
+
+        Assert.Null(fleet.Failure);
+        var decision = Assert.Single(fleet.Snapshot!.Records, record => record.CaptainActionable);
+        Assert.Equal(("billing-choice", "Billing API versioning", "Options: A path prefix, B header"), (decision.Id, decision.Title, decision.HoldReason));
+        Assert.Equal(["ship-task"], Assert.Single(fleet.Snapshot.Records, record => record.Id == "release-notes").UnresolvedBlockerIds);
+        Assert.NotNull(Assert.Single(fleet.Snapshot.Records, record => record.State == "done").CompletedAt);
+        Assert.Contains(fleet.Snapshot.Tasks, task => task is { Title: "Fix the login redirect", SecondMate: false });
+    }
+
     static TempDirectory ThrowawayHome()
     {
         var root = Environment.GetEnvironmentVariable(ContractFactAttribute.Variable)!;
@@ -54,6 +79,32 @@ public sealed class ContractTests
         Directory.CreateDirectory(home.Combine("state"));
         Directory.CreateDirectory(home.Combine("data"));
         File.CreateSymbolicLink(home.Combine("bin"), Path.Combine(root, "bin"));
+        return home;
+    }
+
+    /// <summary>A home with one held decision, one in-flight task, one queued task and one landed item, so the snapshot scripts have real rows to project.</summary>
+    static TempDirectory SeededHome()
+    {
+        var home = ThrowawayHome();
+        var yesterday = DateTime.UtcNow.Date.AddDays(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        File.WriteAllText(home.Combine("data", "backlog.md"), $"""
+            ## In flight
+            - [ ] ship-task - Fix the login redirect (repo: acme/webapp) (kind: ship) (since {yesterday})
+
+            ## Queued
+            - [ ] release-notes - Release notes blocked-by: ship-task (repo: acme/webapp) (kind: ship)
+            - [ ] billing-choice - Billing API versioning (repo: acme/webapp) (kind: captain) (hold: Options: A path prefix, B header) (hold-kind: captain) (since {yesterday})
+
+            ## Done
+            - [x] docs-refresh - Docs refresh https://github.com/acme/webapp/pull/5 (repo: acme/webapp) (kind: ship) (merged {yesterday})
+            """);
+        File.WriteAllText(home.Combine("state", "ship-task.meta"), $"""
+            window=firstmate:fm-ship-task
+            worktree={home.Path}/projects/ship-wt
+            project=acme/webapp
+            harness=claude
+            kind=ship
+            """);
         return home;
     }
 
