@@ -31,6 +31,7 @@ cd firstmate-telegram
 `install.sh` builds the app, links `~/.local/bin/firstmate-telegram`, runs `firstmate-telegram setup` the first time, installs the login agent and runs `firstmate-telegram doctor`.
 Setup saves the bot token, checks the FirstMate home, and pairs your Telegram account: you send the bot a message and confirm it on the Mac.
 Run `./install.sh` again to upgrade, `./install.sh --uninstall` to remove it (add `--purge` to also remove its configuration and state), and add `--dry-run` to see what it would do.
+An upgrade swaps the app folder and reloads the login agent. Reloading first waits out the short window in which macOS launchd is still removing the old agent, and retries loading if it collides with that removal anyway. If loading still fails, install.sh stops and says exactly what to run: `firstmate-telegram start` loads the agent, and `firstmate-telegram doctor` checks it (doctor reports the agent as `installed but not loaded` until then).
 
 ## The chat
 

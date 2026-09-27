@@ -28,6 +28,9 @@ public sealed class LaunchdServiceInstaller : IServiceInstaller
 {
     const string Launchctl = "/bin/launchctl";
     static readonly TimeSpan CallTimeout = TimeSpan.FromSeconds(30);
+    const int BootstrapAttempts = 3;
+    /// <summary>launchd's exit code when a bootstrap races the teardown of the previous job: Input/output error.</summary>
+    const int TeardownRaceExitCode = 5;
 
     readonly BridgePaths _paths;
     readonly IProcessRunner _runner;
@@ -40,6 +43,14 @@ public sealed class LaunchdServiceInstaller : IServiceInstaller
         _runner = runner;
         _tools = tools;
     }
+
+    public TimeProvider Time { get; init; } = TimeProvider.System;
+
+    /// <summary>How long to wait for launchd to finish removing or registering the agent; bounded, never longer.</summary>
+    public TimeSpan ReloadWait { get; init; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>How long to sleep between launchctl polls and bootstrap retries.</summary>
+    public TimeSpan ReloadPollInterval { get; init; } = TimeSpan.FromMilliseconds(250);
 
     public bool IsInstalled => File.Exists(_paths.LaunchAgentPlist);
 
@@ -71,7 +82,7 @@ public sealed class LaunchdServiceInstaller : IServiceInstaller
         Directory.CreateDirectory(Path.GetDirectoryName(_paths.LaunchAgentPlist)!);
         PrivateFiles.WriteAtomic(_paths.LaunchAgentPlist, LaunchAgentPlist.Build(Settings(firstmateHome)), PlistMode);
         await StopAsync(cancellationToken);
-        await RequireAsync(["bootstrap", await DomainAsync(cancellationToken), _paths.LaunchAgentPlist], "load the login agent", cancellationToken);
+        await BootstrapAsync(cancellationToken);
     }
 
     public async Task UninstallAsync(CancellationToken cancellationToken)
@@ -86,17 +97,71 @@ public sealed class LaunchdServiceInstaller : IServiceInstaller
             throw new BridgeException("The login agent is not installed. Run ./install.sh, or `firstmate-telegram run` to run the bridge in this terminal.");
 
         if (!await IsLoadedAsync(cancellationToken))
-            await RequireAsync(["bootstrap", await DomainAsync(cancellationToken), _paths.LaunchAgentPlist], "load the login agent", cancellationToken);
+            await BootstrapAsync(cancellationToken);
         await RequireAsync(["kickstart", await ServiceTargetAsync(cancellationToken)], "start the login agent", cancellationToken);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        if (await IsLoadedAsync(cancellationToken))
-            await RequireAsync(["bootout", await ServiceTargetAsync(cancellationToken)], "unload the login agent", cancellationToken);
+        if (!await IsLoadedAsync(cancellationToken))
+            return;
+
+        await RequireAsync(["bootout", await ServiceTargetAsync(cancellationToken)], "unload the login agent", cancellationToken);
+        // bootout can return before launchd has finished removing the job, and a bootstrap racing that
+        // teardown fails with error 5. Wait, bounded, for print to report the job gone (best effort;
+        // the bootstrap retries below are the backstop).
+        await WaitUntilAsync(loaded: false, cancellationToken);
     }
 
     const UnixFileMode PlistMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead;
+
+    /// <summary>Loads the agent, retrying the teardown race a bounded number of times, then verifies the job is loaded.</summary>
+    async Task BootstrapAsync(CancellationToken cancellationToken)
+    {
+        var arguments = (IReadOnlyList<string>)["bootstrap", await DomainAsync(cancellationToken), _paths.LaunchAgentPlist];
+        for (var attempt = 1; ; attempt++)
+        {
+            var result = await LaunchctlAsync(arguments, cancellationToken);
+            if (result.Ran && result.ExitCode == 0)
+                break;
+
+            if (attempt < BootstrapAttempts && result.Ran && IsTeardownRace(result))
+            {
+                await Task.Delay(ReloadPollInterval, Time, cancellationToken);
+                continue;
+            }
+
+            var detail = result.TimedOut ? "timed out" : result.StartFailure ?? result.StandardError.Trim();
+            var attempts = attempt > 1 ? $" ({attempt} attempts)" : "";
+            throw new BridgeException(
+                $"launchctl bootstrap could not load the login agent{attempts}: {detail}. " +
+                LoadRecovery);
+        }
+
+        if (!await WaitUntilAsync(loaded: true, cancellationToken))
+            throw new BridgeException(
+                $"launchctl bootstrap reported success but the login agent is not loaded in launchd. " + LoadRecovery);
+    }
+
+    const string LoadRecovery =
+        "The login agent is installed but not loaded; run `firstmate-telegram start` to load it, then `firstmate-telegram doctor` to check it.";
+
+    /// <summary>The bootstrap raced launchd's removal of the previous job: Input/output error, exit code 5.</summary>
+    static bool IsTeardownRace(ProcessResult result) =>
+        result.ExitCode == TeardownRaceExitCode || result.StandardError.Contains("Input/output error", StringComparison.Ordinal);
+
+    /// <summary>Polls print until the job matches <paramref name="loaded"/>, no longer than <see cref="ReloadWait"/>.</summary>
+    async Task<bool> WaitUntilAsync(bool loaded, CancellationToken cancellationToken)
+    {
+        var deadline = Time.GetUtcNow() + ReloadWait;
+        while (await IsLoadedAsync(cancellationToken) != loaded)
+        {
+            if (Time.GetUtcNow() >= deadline)
+                return false;
+            await Task.Delay(ReloadPollInterval, Time, cancellationToken);
+        }
+        return true;
+    }
 
     async Task RequireAsync(IReadOnlyList<string> arguments, string purpose, CancellationToken cancellationToken)
     {
