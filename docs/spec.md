@@ -1,6 +1,6 @@
 # firstmate-telegram: v1 specification
 
-Status: specification. No code exists yet; v1 is built against this document.
+Status: specification. v1 is built against this document, one part at a time.
 Every FirstMate fact below was checked against FirstMate `main` at commit [`e9a6675`][fm-commit] (2026-09-26).
 Words with a fixed meaning here (bridge, request, reply, alert, status answer, availability, ping, away mode, private project, explicit return) are defined in [CONTEXT.md](../CONTEXT.md).
 
@@ -633,7 +633,7 @@ The bridge runs its own `getUpdates` loop rather than the library's built-in rec
 | --- | --- | --- |
 | Receiving an update and running `note` | The update is delivered again, and `note` runs for the first time | One note |
 | `note` saving and the bridge saving its state | The update is delivered again; the same request id returns the same note (`replay`) | One note, and the mapping is recovered |
-| The bridge saving its state and confirming the offset | The update is delivered again; `note` returns `replay` | One note |
+| The bridge saving its state and confirming the offset | The first `getUpdates` after the restart passes the saved offset, which confirms the update; it is not delivered again | One note |
 | `note` exiting 3 and the `announce` repair | The repair runs from the saved state | One note, one wake |
 
 - **Only an unbroken run of handled updates is confirmed.** If a request cannot be saved (7.2.1, exit 1), later updates in the same batch are still processed:
@@ -896,7 +896,7 @@ flowchart LR
 
 - Time comes from an injected `TimeProvider`, and process execution from an injected runner, so tests control both.
 - JSON handling uses System.Text.Json source generation, which leaves a later Native AOT build possible.
-- The implementation PRs will add `src/FirstmateTelegram/`, `tests/FirstmateTelegram.Tests/` and `install.sh`. This spec and the glossary stay where they are.
+- The implementation lives in `src/FirstmateTelegram/`, `tests/FirstmateTelegram.Tests/` and `install.sh`. This spec and the glossary stay where they are.
 
 ## 13. Testing strategy
 
