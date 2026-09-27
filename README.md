@@ -20,6 +20,8 @@ It talks to FirstMate only through FirstMate's inbox and records, needs no First
 
 ## Install
 
+**New here? Follow the step-by-step [setup tutorial](docs/tutorial.md).** It covers creating the bot, installing, pairing, the first message, every command, keeping the token safe, troubleshooting, upgrading and uninstalling.
+
 You need macOS, the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0), a FirstMate home, and a bot of your own from [BotFather](https://t.me/BotFather).
 
 ```sh
