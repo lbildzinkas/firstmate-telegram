@@ -50,6 +50,11 @@ From Telegram, anything that is not one of these commands is sent to FirstMate a
 
 Alerts come from FirstMate's own records: the fleet activity ledger (`state/fleet-ledger.jsonl`, which the FirstMate user turns on by creating `config/fleet-ledger` in the FirstMate home) for PRs ready for review, finished research and worker blockers or failures, and the fleet snapshot for decisions waiting on you. Availability alerts fire only in true away mode. Replying to an alert sends FirstMate a request tied to that alert. Projects named in the deny list (`deny_list` in the configuration, empty by default) appear in Telegram only as "a private project".
 
+## Known issues
+
+Until FirstMate includes [pull request 5929](https://github.com/kunchenguid/firstmate/pull/5929), a request can wait several minutes before FirstMate sees it: FirstMate's watchers can skip announcing a new inbox note until their cycle closes for another reason (reported upstream as [issue 5967](https://github.com/kunchenguid/firstmate/issues/5967)).
+The bridge is not at fault and the request is not lost: once FirstMate picks it up, replies and alerts work as usual.
+
 ## Local commands
 
 | Command | What it does |
