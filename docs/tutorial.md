@@ -225,6 +225,8 @@ Login agent installed: ~/Library/LaunchAgents/io.github.lbildzinkas.firstmate-te
 - It runs whether or not FirstMate does. That is what lets `/ping` tell you FirstMate is down.
 - It remembers where `bash`, `python3`, `jq`, `quota-axi` and `dotnet` were in the shell that installed it. If you install one of them later, or move it, run `firstmate-telegram service install` again.
 
+The bridge's own log is `~/Library/Logs/firstmate-telegram/bridge.log`; [section 14](#14-troubleshooting) says how to use it when something seems wrong.
+
 ## 7. Check everything with doctor
 
 `install.sh` ends by running `doctor`. Run it yourself whenever something seems off:
@@ -447,6 +449,20 @@ firstmate-telegram doctor
 ```
 
 `doctor` should now report `login agent: installed and loaded`. Until then it reports `installed but not loaded`.
+
+### Doctor says everything is fine, but messages are slow or never answered
+
+`doctor` checks the installation, not the running bridge, so it can print `Everything checks out.` while the login agent restarts a crashing bridge every few seconds.
+Ask launchd whether that is happening:
+
+```sh
+launchctl print gui/$(id -u)/io.github.lbildzinkas.firstmate-telegram
+```
+
+Look at `runs` and `last exit code` in the output: a `runs` count that keeps climbing, with a non-zero `last exit code`, means the login agent keeps restarting a bridge that crashes.
+Then read the bridge's own log, `~/Library/Logs/firstmate-telegram/bridge.log`, for the error it dies on.
+
+If the bridge is running steadily and messages are only slow, the wait can be on FirstMate's side; see [Known issues](../README.md#known-issues) in the README.
 
 ### Other symptoms
 
