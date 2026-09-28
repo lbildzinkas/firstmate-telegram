@@ -37,6 +37,34 @@ public sealed class RunCommandTests
         Assert.NotEmpty(store.State.ReplyCursor);
     }
 
+    // The state file a bridge from before the alert watchers wrote has no settles member, and the first upgraded run
+    // wrote it back as null; the alert watcher's first pass must read both as no settle watches, not stop the bridge.
+    [Theory]
+    [InlineData("")]
+    [InlineData(""","settles":null""")]
+    public async Task Run_keeps_going_on_a_state_file_written_before_the_alert_watchers(string settlesMember)
+    {
+        await using var harness = await BridgeHarness.StartAsync();
+        WriteConfigAndToken(harness);
+        Directory.CreateDirectory(harness.Paths.StateDirectory);
+        await File.WriteAllTextAsync(
+            harness.Paths.StateFile,
+            $$"""{"schema":"firstmate-telegram.state.v1","bot_id":{{FakeTelegramServer.BotId}},"update_offset":0,"handled_update_ids":[],"reply_cursor":"","stopped":false{{settlesMember}}}""");
+        using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var run = RunCommand.RunAsync(Environment(harness), cancel.Token);
+
+        // The alert watcher's first pass reads the fleet snapshot, then checks its settle watches.
+        await Eventually(() => run.IsCompleted || harness.FirstMate.SnapshotCalls("fleet").Count > 0 ? "read" : null);
+        harness.Telegram.EnqueueText(BridgeHarness.UserId, "request after an upgrade");
+        await Eventually(() => run.IsCompleted ? "stopped" : harness.FirstMate.NoteIds().SingleOrDefault());
+        await cancel.CancelAsync();
+        var exitCode = await run;
+
+        Assert.DoesNotContain("BackgroundService failed", await File.ReadAllTextAsync(harness.Paths.LogFile));
+        Assert.Equal(0, exitCode);
+        Assert.Contains("\"settles\": []", await File.ReadAllTextAsync(harness.Paths.StateFile));
+    }
+
     [Fact]
     public async Task While_the_stopped_flag_is_set_run_exits_0_at_once_without_polling()
     {

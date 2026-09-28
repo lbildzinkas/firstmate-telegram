@@ -46,7 +46,7 @@ public sealed class StateStore : IDisposable
 
     public static StateStore Open(BridgePaths paths, IStateWriter? writer = null)
     {
-        var state = Read(paths.StateFile, StateJsonContext.Default.BridgeState, BridgeState.SchemaName, document => document.Schema) ?? new BridgeState();
+        var state = WithDefaults(Read(paths.StateFile, StateJsonContext.Default.BridgeState, BridgeState.SchemaName, document => document.Schema) ?? new BridgeState());
         var requests = Read(paths.RequestsFile, StateJsonContext.Default.RequestsDocument, RequestsDocument.SchemaName, document => document.Schema) ?? new RequestsDocument();
         var alerts = Read(paths.AlertsFile, StateJsonContext.Default.AlertsDocument, AlertsDocument.SchemaName, document => document.Schema) ?? new AlertsDocument();
         var requestMap = requests.Requests.ToImmutableDictionary(entry => entry.NoteId, StringComparer.Ordinal);
@@ -119,6 +119,18 @@ public sealed class StateStore : IDisposable
         PrivateFiles.EnsureDirectory(_paths.StateDirectory);
         _writer.Write(path, JsonSerializer.Serialize(document, typeInfo) + "\n");
     }
+
+    /// <summary>
+    /// The generated reader sets a member missing from the file to null instead of keeping its initializer. A state
+    /// file from before the settle watches has no settles member, and a bridge that read it wrote it back as null;
+    /// both load as empty.
+    /// </summary>
+    static BridgeState WithDefaults(BridgeState state) => state with
+    {
+        HandledUpdateIds = state.HandledUpdateIds ?? [],
+        ReplyCursor = state.ReplyCursor ?? "",
+        Settles = state.Settles ?? [],
+    };
 
     static T? Read<T>(string path, JsonTypeInfo<T> typeInfo, string schema, Func<T, string> schemaOf)
         where T : class
