@@ -55,6 +55,22 @@ public sealed class StateStoreTests
         Assert.Equal(3, reopened.State.UpdateOffset);
     }
 
+    [Theory]
+    [InlineData("""{"schema":"firstmate-telegram.state.v1","update_offset":7}""")]
+    [InlineData("""{"schema":"firstmate-telegram.state.v1","update_offset":7,"handled_update_ids":null,"reply_cursor":null,"settles":null}""")]
+    public void A_state_file_missing_later_members_opens_with_their_defaults(string contents)
+    {
+        using var directory = new TempDirectory();
+        var paths = Paths(directory);
+        Directory.CreateDirectory(paths.StateDirectory);
+        File.WriteAllText(paths.StateFile, contents);
+
+        using var store = StateStore.Open(paths);
+
+        Assert.Equal(7, store.State.UpdateOffset);
+        Assert.Equal((0, "", 0), (store.State.HandledUpdateIds.Count, store.State.ReplyCursor, store.State.Settles.Count));
+    }
+
     [Fact]
     public void An_unreadable_state_file_is_refused_with_a_way_out()
     {
